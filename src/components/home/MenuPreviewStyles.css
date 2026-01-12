@@ -1,0 +1,85 @@
+/* --- RUBAN BEST SELLER (Coin supérieur droit) --- */
+.ribbon {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 100px;
+    height: 100px;
+    overflow: hidden;
+    z-index: 30;
+}
+
+.ribbon span {
+    position: absolute;
+    display: block;
+    width: 160px;
+    padding: 8px 0;
+    background-color: #F59E0B; /* Couleur Accent (Orange) */
+    box-shadow: 0 5px 10px rgba(0,0,0,.1);
+    color: #fff;
+    font-family: 'Fredoka', sans-serif; /* Ta font titre */
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    text-align: center;
+    left: -15px;
+    top: 22px;
+    transform: rotate(45deg); /* Rotation diagonale */
+}
+
+/* Petit effet d'ombre sous le ruban pour le réalisme */
+.ribbon::before,
+.ribbon::after {
+    position: absolute;
+    z-index: -1;
+    content: '';
+    display: block;
+    border: 3px solid #b45309; /* Couleur plus sombre pour l'ombre */
+    border-top-color: transparent;
+    border-right-color: transparent;
+}
+.ribbon::before { top: 0; left: 0; }
+.ribbon::after { bottom: 0; right: 0; }
+
+
+/* --- FLÈCHES DE NAVIGATION (Minimalistes) --- */
+.product-swiper .swiper-button-prev,
+.product-swiper .swiper-button-next {
+    width: 40px !important;
+    height: 40px !important;
+    background: transparent !important; /* Pas de fond */
+    color: #1e293b !important; /* Couleur sombre */
+    border: none !important;
+    box-shadow: none !important;
+    transition: all 0.2s ease;
+}
+
+/* On personnalise l'icône (le chevron) */
+.product-swiper .swiper-button-prev::after,
+.product-swiper .swiper-button-next::after {
+    font-size: 24px !important;
+    font-weight: 900; /* Gras pour bien voir */
+}
+
+/* Au survol, on bouge légèrement la flèche */
+.product-swiper .swiper-button-prev:hover {
+    transform: translateX(-3px);
+    color: #38BDF8 !important; /* Bleu primaire */
+}
+.product-swiper .swiper-button-next:hover {
+    transform: translateX(3px);
+    color: #38BDF8 !important;
+}
+
+/* Positionnement : En dehors du contenu */
+.product-swiper .swiper-button-prev {
+    left: -10px !important;
+}
+.product-swiper .swiper-button-next {
+    right: -10px !important;
+}
+
+/* --- POINTS DE PAGINATION (Dots) --- */
+.swiper-pagination-bullet-active {
+    background-color: #38BDF8 !important;
+}
