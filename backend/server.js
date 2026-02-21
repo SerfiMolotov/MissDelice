@@ -19,7 +19,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Dossier public pour les images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 console.log("3. Tentative de connexion à la base de données...");
@@ -61,19 +60,16 @@ const upload = multer({ storage: storage });
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
 
-    // 1. On cherche l'utilisateur dans la BDD
     const sql = "SELECT * FROM users WHERE username = ?";
     db.query(sql, [username], async (err, results) => {
         if (err) return res.status(500).json({ error: "Erreur serveur" });
 
-        // Si aucun utilisateur trouvé
         if (results.length === 0) {
             return res.status(401).json({ error: "Utilisateur inconnu" });
         }
 
         const user = results[0];
 
-        // 2. On compare le mot de passe envoyé avec le mot de passe crypté en BDD
         const match = await bcrypt.compare(password, user.password);
 
         if (match) {
@@ -90,7 +86,6 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-// 1. Récupérer toutes les catégories
 app.get('/api/categories', (req, res) => {
     const sql = "SELECT * FROM categories ORDER BY display_order ASC";
     db.query(sql, (err, results) => {
@@ -103,7 +98,7 @@ app.get('/api/categories', (req, res) => {
             ...cat,
             image_url: cat.image_url && cat.image_url.startsWith('http')
                 ? cat.image_url
-                : (cat.image_url ? `http://localhost:3000/uploads/categories/${cat.image_url}` : null)
+                : (cat.image_url ? `/uploads/categories/${cat.image_url}` : null)
         }));
         res.json(categories);
     });
@@ -238,9 +233,8 @@ app.get('/api/products', (req, res) => {
 
         const products = results.map(prod => ({
             ...prod,
-            // On gère l'URL de l'image produit
             image_url: prod.image_url
-                ? `http://localhost:3000/uploads/products/${prod.image_url}`
+                ? `/uploads/products/${prod.image_url}`
                 : null
         }));
         res.json(products);
@@ -318,7 +312,7 @@ app.delete('/api/products/:id', (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         if (results.length > 0 && results[0].image_url) {
             const filePath = path.join(__dirname, 'uploads/products', results[0].image_url);
-            fs.unlink(filePath, () => {}); // On supprime le fichier
+            fs.unlink(filePath, () => {});
         }
 
         db.query("DELETE FROM products WHERE id = ?", [id], (err) => {
@@ -327,6 +321,149 @@ app.delete('/api/products/:id', (req, res) => {
         });
     });
 });
+
+// ROUTES POUR LES RÉGLAGES
+
+app.get('/api/settings/saturday', (req, res) => {
+    const sql = "SELECT setting_value FROM settings WHERE setting_key = 'saturday_open'";
+    db.query(sql, (err, result) => {
+        if (err) return res.status(500).json(err);
+        if (result.length > 0) {
+            const isOpen = result[0].setting_value === 'true';
+            return res.json({ isOpen });
+        }
+        return res.json({ isOpen: false });
+    });
+});
+
+app.put('/api/settings/saturday', (req, res) => {
+    const { isOpen } = req.body;
+    const valueStr = isOpen ? 'true' : 'false';
+
+    const sql = "UPDATE settings SET setting_value = ? WHERE setting_key = 'saturday_open'";
+    db.query(sql, [valueStr], (err, result) => {
+        if (err) return res.status(500).json(err);
+        return res.json({ message: "Horaire samedi mis à jour", isOpen });
+    });
+});
+
+app.get('/api/categories/:id/supplements', (req, res) => {
+    const sql = "SELECT * FROM supplements WHERE category_id = ?";
+    db.query(sql, [req.params.id], (err, result) => {
+        if (err) return res.status(500).json(err);
+        res.json(result);
+    });
+});
+
+app.post('/api/supplements', (req, res) => {
+    const { category_id, name, price, icon } = req.body;
+    const sql = "INSERT INTO supplements (category_id, name, price, icon) VALUES (?, ?, ?, ?)";
+    db.query(sql, [category_id, name, price, icon], (err, result) => {
+        if (err) return res.status(500).json(err);
+        res.json({ id: result.insertId, message: "Supplément ajouté" });
+    });
+});
+
+app.delete('/api/supplements/:id', (req, res) => {
+    const sql = "DELETE FROM supplements WHERE id = ?";
+    db.query(sql, [req.params.id], (err, result) => {
+        if (err) return res.status(500).json(err);
+        res.json({ message: "Supplément supprimé" });
+    });
+});
+
+
+const { BetaAnalyticsDataClient } = require('@google-analytics/data');
+
+const analyticsClient = new BetaAnalyticsDataClient({
+    keyFilename: './service-account.json',
+});
+
+const PROPERTY_ID = '522372058';
+
+app.get('/api/analytics', async (req, res) => {
+    try {
+        console.log("🔍 Récupération des stats Analytics...");
+
+        const [response] = await analyticsClient.runReport({
+            property: `properties/${PROPERTY_ID}`,
+            dateRanges: [
+                {
+                    startDate: '7daysAgo',
+                    endDate: 'today',
+                },
+            ],
+            metrics: [
+                { name: 'activeUsers' },
+                { name: 'screenPageViews' },
+            ],
+            dimensions: [
+                { name: 'date' },
+            ],
+            orderBys: [
+                { dimension: { orderType: 'ALPHANUMERIC', dimensionName: 'date' } }
+            ]
+        });
+
+        const chartData = response.rows ? response.rows.map(row => ({
+            date: row.dimensionValues[0].value,
+            users: parseInt(row.metricValues[0].value),
+            views: parseInt(row.metricValues[1].value),
+        })) : [];
+
+        const totalUsers = chartData.reduce((acc, curr) => acc + curr.users, 0);
+        const totalViews = chartData.reduce((acc, curr) => acc + curr.views, 0);
+
+        console.log("✅ Stats récupérées avec succès !");
+
+        res.json({
+            success: true,
+            summary: {
+                users: totalUsers,
+                views: totalViews,
+            },
+            chart: chartData
+        });
+
+    } catch (error) {
+        console.error("❌ Erreur Analytics:", error.message);
+        res.json({
+            success: false,
+            error: error.message,
+            summary: { users: 0, views: 0 },
+            chart: []
+        });
+    }
+});
+
+// --- GESTION DES HORAIRES ---
+app.get('/api/hours', async (req, res) => {
+    try {
+        // AJOUT DE .promise() ICI 👇
+        const [rows] = await db.promise().query('SELECT * FROM opening_hours ORDER BY day_order ASC');
+        res.json(rows);
+    } catch (error) {
+        console.error("ERREUR SQL CRITIQUE dans /api/hours :", error.message);
+        res.status(500).json({ error: "Erreur serveur lors de la lecture des horaires." });
+    }
+});
+
+app.put('/api/hours', async (req, res) => {
+    const hoursData = req.body;
+    try {
+        for (const day of hoursData) {
+            await db.promise().query(
+                'UPDATE opening_hours SET is_closed = ?, hours_text = ? WHERE id = ?',
+                [day.is_closed, day.hours_text, day.id]
+            );
+        }
+        res.json({ success: true, message: "Horaires mis à jour !" });
+    } catch (error) {
+        console.error("ERREUR SQL CRITIQUE (PUT /api/hours) :", error.message);
+        res.status(500).json({ error: "Erreur lors de la sauvegarde des horaires." });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 SUCCÈS : Serveur démarré sur http://localhost:${PORT}`);

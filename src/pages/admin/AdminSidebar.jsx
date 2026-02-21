@@ -59,6 +59,10 @@ const AdminSidebar = () => {
                     <Link to="/admin/products" className={linkClass('/admin/products')} onClick={() => setIsOpen(false)}>
                         <span>🍩</span> Produits
                     </Link>
+                    
+                    <Link to="/admin/hours" className={linkClass('/admin/hours')} onClick={() => setIsOpen(false)}>
+                        <span>⏰</span> Horaires
+                    </Link>
                 </nav>
 
                 <div className="p-6 border-t border-slate-100">

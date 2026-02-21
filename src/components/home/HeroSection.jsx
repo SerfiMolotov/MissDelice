@@ -7,21 +7,17 @@ import { Link } from 'react-router-dom';
 import 'swiper/css';
 import 'swiper/css/effect-fade';
 
-// Tes images
-import img1 from '../../assets/images/gauffre.jpg';
+import img1 from '../../assets/images/plate-with-gourmet-waffles-with-chocolate-banana-slices.jpg';
 import img2 from '../../assets/images/churros.jpg';
-import img3 from '../../assets/images/rando.jpg';
-import img4 from '../../assets/images/rando2.jpg';
+import img3 from '../../assets/images/pancakes-with-chocolate-jam-berries-tasty-breakfast-flat-lay-top-view.jpg';
+import img4 from '../../assets/images/homemade-sweet-fritter-with-sugar-rustic-table-generative-ai.jpg';
 
 const slideImages = [img1, img2, img3, img4];
 
 const HeroSection = () => {
     return (
-        // CHANGEMENT 1 : On met le background en 'bg-cream' (ta couleur de fond) au lieu de noir.
-        // Comme ça, si il y a un bug de pixel, ce sera blanc sur blanc => invisible !
         <div className="relative h-screen w-full overflow-hidden bg-[#FDFBF7]">
 
-            {/* Animation Ken Burns (Zoom) */}
             <style>{`
                 @keyframes kenBurns {
                     0% { transform: scale(1); }
@@ -48,13 +44,11 @@ const HeroSection = () => {
                 {slideImages.map((imgSrc, index) => (
                     <SwiperSlide key={index}>
                         <div className="relative w-full h-full overflow-hidden">
-                            {/* CHANGEMENT 2 : scale-105 par défaut pour forcer l'image à dépasser légèrement des bords */}
                             <div
                                 className="w-full h-full bg-cover bg-center animate-ken-burns scale-105"
                                 style={{ backgroundImage: `url(${imgSrc})` }}
                             ></div>
 
-                            {/* Overlay sombre pour la lisibilité */}
                             <div className="absolute inset-0 bg-black/40"></div>
                         </div>
                     </SwiperSlide>
@@ -109,10 +103,8 @@ const HeroSection = () => {
                 </motion.div>
             </div>
 
-            {/* --- LE FONDU CLASSIQUE (GRADIENT) --- */}
-            {/* C'est propre, simple et ça fait une transition douce vers le contenu en dessous */}
-            {/* J'ai mis h-48 pour que le dégradé soit bien long et doux */}
-            <div className="absolute bottom-0 left-0 w-full h-48 bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7]/60 to-transparent z-20 pointer-events-none"></div>
+            {/* --- LE FONDU --- */}
+            <div className="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7]/60 to-transparent z-20 pointer-events-none"></div>
 
         </div>
     );

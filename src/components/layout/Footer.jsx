@@ -14,7 +14,7 @@ const Footer = () => {
                             <img
                                 src={logo}
                                 alt="Logo Miss Délice"
-                                className="h-12 w-auto rounded-full border-2 border-white/20"
+                                className="h-12 w-auto"
                             />
                             <span className="font-title text-2xl font-bold tracking-wide">Miss Délice</span>
                         </div>
@@ -44,7 +44,7 @@ const Footer = () => {
                             </li>
 
                             <li className="flex items-center md:justify-end gap-2">
-                                <span>06 59 15 25 09</span>
+                                <a href="tel:0659152509"> 06 59 15 25 09 </a>
                                 <svg className="w-5 h-5 text-primary hidden md:block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                             </li>
 
@@ -57,12 +57,11 @@ const Footer = () => {
                     </div>
 
                 </div>
-
-                {/* --- LIGNE DE SÉPARATION --- */}
-                <div className="border-t border-slate-800 pt-6 mt-6 text-center">
-                    <p className="text-slate-500 text-xs">
-                        © {new Date().getFullYear()} Miss Délice. Tous droits réservés.
-                    </p>
+                <div className="mt-8 pt-8 border-t border-white/10 text-center text-sm opacity-60">
+                    <p>&copy; {new Date().getFullYear()} Miss Délice. Tous droits réservés.</p>
+                    <div className="flex justify-center gap-4 mt-2">
+                        <Link to="/mentions-legales" className="hover:text-primary transition-colors">Mentions Légales & CGV</Link>
+                    </div>
                 </div>
             </div>
         </footer>

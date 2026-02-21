@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminSidebar from './AdminSidebar.jsx'
+import AdminSidebar from './AdminSidebar.jsx';
+import DashboardStats from './DashboardStats';
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    // On prépare des états pour les stats (on les connectera plus tard)
+
     const [stats, setStats] = useState({ products: 0, categories: 0 });
 
     useEffect(() => {
         const token = localStorage.getItem('token');
         if (!token) navigate('/login');
 
-        // Ici, on fera un fetch pour récupérer les vrais chiffres plus tard
-        // Pour l'instant, je mets des faux chiffres pour que tu voies le design
+        // Idéalement, faire un vrai fetch ici pour récupérer les vraies stats
         setStats({ products: 12, categories: 4 });
     }, [navigate]);
 
@@ -30,7 +30,11 @@ const Dashboard = () => {
                     <p className="text-slate-500 mt-2">Bienvenue dans votre espace de gestion.</p>
                 </header>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <DashboardStats />
+
+                <h2 className="text-xl font-bold text-slate-700 mb-6">Gestion rapide</h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4">
                         <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-2xl">
@@ -44,7 +48,7 @@ const Dashboard = () => {
 
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4">
                         <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center text-2xl">
-                            Cat
+                            📂
                         </div>
                         <div>
                             <p className="text-slate-400 text-sm font-bold uppercase">Catégories</p>
@@ -54,7 +58,7 @@ const Dashboard = () => {
 
                     <div className="bg-gradient-to-br from-primary to-primary-dark p-6 rounded-3xl shadow-lg text-white flex flex-col justify-between">
                         <p className="font-bold opacity-90">Besoin d'ajouter une nouveauté ?</p>
-                        <button className="mt-4 bg-white text-primary px-4 py-2 rounded-xl font-bold text-sm self-start hover:shadow-lg transition-all">
+                        <button className="mt-4 bg-white text-primary px-4 py-2 rounded-xl font-bold text-sm self-start hover:shadow-lg transition-all hover:scale-105">
                             + Ajouter un produit
                         </button>
                     </div>

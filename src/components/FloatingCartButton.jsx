@@ -5,7 +5,7 @@ const FloatingCartButton = () => {
     const { setIsCartOpen, getCartCount } = useCart();
     const count = getCartCount();
 
-    if (count === 0) return null; // On le cache si panier vide
+    if (count === 0) return null;
 
     return (
         <button

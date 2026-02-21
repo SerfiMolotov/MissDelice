@@ -8,11 +8,11 @@ const Login = () => {
     const navigate = useNavigate();
 
     const handleLogin = async (e) => {
-        e.preventDefault(); // Empêche la page de se recharger
+        e.preventDefault();
         setError('');
 
         try {
-            const response = await fetch('http://localhost:3000/api/login', {
+            const response = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -21,11 +21,8 @@ const Login = () => {
             const data = await response.json();
 
             if (response.ok) {
-                // SUCCÈS ! 🎉
-                // 1. On stocke le fameux "Tampon" (Token) dans la mémoire du navigateur
                 localStorage.setItem('token', data.token);
 
-                // 2. On redirige vers le tableau de bord
                 navigate('/admin/dashboard');
             } else {
                 // ERREUR (Mauvais mot de passe)

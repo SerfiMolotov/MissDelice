@@ -5,11 +5,10 @@ import { useCart } from '../context/CartContext';
 const CartSidebar = () => {
     const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, addToCart, getCartTotal, clearCart } = useCart();
 
-    // États du formulaire
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
-        email: '', // Pour envoyer le mail de confirm
+        email: '',
         delivery: false,
         address: '',
         city: '',
@@ -28,26 +27,21 @@ const CartSidebar = () => {
             const now = new Date();
             const currentHour = now.getHours();
             const currentMin = now.getMinutes();
-            const day = now.getDay(); // 0 = Dimanche, 1 = Lundi...
+            const day = now.getDay();
 
-            // Règle : Fermé le Mardi (2)
             if (day === 2) return [];
 
-            // Plage d'ouverture : 14h00 à 18h00
             const startHour = 14;
             const endHour = 18;
 
-            // On génère les créneaux par tranche de 15min
             for (let h = startHour; h < endHour; h++) {
                 for (let m = 0; m < 60; m += 15) {
                     // Création de l'heure du créneau
                     const slotTime = new Date();
                     slotTime.setHours(h, m, 0);
 
-                    // Règle : Il faut au moins 15 min de préparation
                     const bufferTime = new Date(now.getTime() + 15 * 60000);
 
-                    // Si le créneau est dans le futur (+15min), on l'ajoute
                     if (slotTime > bufferTime) {
                         const timeString = `${h.toString().padStart(2, '0')}h${m.toString().padStart(2, '0')}`;
                         slots.push(timeString);
@@ -62,10 +56,8 @@ const CartSidebar = () => {
         }
     }, [isCartOpen]);
 
-    // Formatage Prix
     const formatPrice = (p) => parseFloat(p).toFixed(2).replace('.', ',') + '€';
 
-    // Gestion des champs
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData(prev => ({
@@ -74,7 +66,6 @@ const CartSidebar = () => {
         }));
     };
 
-    // --- SOUMISSION DE LA COMMANDE ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -94,7 +85,7 @@ const CartSidebar = () => {
         };
 
         try {
-            const response = await fetch('http://localhost:3000/api/orders', {
+            const response = await fetch('/api/orders', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(orderData)
@@ -123,7 +114,6 @@ const CartSidebar = () => {
         <AnimatePresence>
             {isCartOpen && (
                 <>
-                    {/* BACKDROP (Fond sombre) */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -132,7 +122,6 @@ const CartSidebar = () => {
                         className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
                     />
 
-                    {/* SIDEBAR */}
                     <motion.div
                         initial={{ x: '100%' }}
                         animate={{ x: 0 }}
@@ -142,7 +131,7 @@ const CartSidebar = () => {
                     >
                         {/* HEADER */}
                         <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-white sticky top-0 z-10">
-                            <h2 className="font-title text-3xl text-slate-800">Mon Panier 🛒</h2>
+                            <h2 className="font-title text-3xl text-slate-800">Mon Panier</h2>
                             <button onClick={() => setIsCartOpen(false)} className="w-10 h-10 rounded-full bg-slate-100 hover:bg-red-100 hover:text-red-500 transition-colors flex items-center justify-center font-bold text-xl">✕</button>
                         </div>
 
@@ -153,7 +142,7 @@ const CartSidebar = () => {
                             {orderSuccess ? (
                                 <div className="text-center py-20">
                                     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                        <span className="text-4xl">🎉</span>
+                                        <span className="text-4xl"></span>
                                     </div>
                                     <h3 className="font-title text-2xl text-green-600 mb-4">Commande Reçue !</h3>
                                     <p className="text-slate-600 mb-2">Merci <strong>{formData.name}</strong>.</p>
@@ -162,7 +151,6 @@ const CartSidebar = () => {
                                 </div>
                             ) : (
                                 <>
-                                    {/* LISTE VIDE */}
                                     {cartItems.length === 0 ? (
                                         <div className="text-center py-20 opacity-50">
                                             <span className="text-6xl block mb-4">🍩</span>
@@ -171,7 +159,6 @@ const CartSidebar = () => {
                                         </div>
                                     ) : (
                                         <>
-                                            {/* LISTE DES ARTICLES */}
                                             <div className="space-y-4 mb-8">
                                                 {cartItems.map(item => (
                                                     <div key={item.id} className="flex gap-4 bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
@@ -216,7 +203,7 @@ const CartSidebar = () => {
                                                             <div className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 ${formData.delivery ? 'translate-x-6' : ''}`} />
                                                         </div>
                                                         <input type="checkbox" name="delivery" checked={formData.delivery} onChange={handleChange} className="hidden" />
-                                                        <span className="font-bold text-slate-700">Je souhaite être livré 🛵</span>
+                                                        <span className="font-bold text-slate-700">Je souhaite être livré</span>
                                                     </label>
                                                     {formData.delivery && <p className="text-xs text-orange-500 mt-1 font-bold ml-14">⚠️ Sous réserve de validation par la gérante</p>}
                                                 </div>
@@ -269,7 +256,7 @@ const CartSidebar = () => {
                                     {isSubmitting ? (
                                         <span className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full"/>
                                     ) : (
-                                        <>Envoyer ma commande 🚀</>
+                                        <>Envoyer ma commande</>
                                     )}
                                 </button>
                                 {availableSlots.length === 0 && <p className="text-center text-red-500 text-xs font-bold mt-2">Désolé, nous sommes fermés pour aujourd'hui !</p>}

@@ -1,138 +1,173 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import Marquee from "react-fast-marquee";
-import { motion } from 'framer-motion';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, Autoplay, Pagination } from 'swiper/modules';
+import waveBlue from '../../assets/images/wave-haikei.svg';
+
+import 'swiper/css';
+import 'swiper/css/pagination';
 
 const MenuPreviewSection = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const fadeInUp = {
-        hidden: { opacity: 0, y: 40 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.6, ease: "easeOut" }
-        }
-    };
-
-    const shuffleArray = (array) => {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
-    };
+    const prevRef = useRef(null);
+    const nextRef = useRef(null);
 
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const response = await fetch('http://localhost:3000/api/products');
+                const response = await fetch('/api/products');
                 const data = await response.json();
-                const shuffled = shuffleArray(data);
-                setProducts(shuffled.slice(0, 12));
+
+                const featured = data.filter(p => p.is_featured === 1);
+                let others = data.filter(p => p.is_featured !== 1);
+                others = others.sort(() => 0.5 - Math.random());
+
+                let allItems = [...featured, ...others];
+
+                while (allItems.length < 10 && allItems.length > 0) {
+                    allItems = [...allItems, ...allItems];
+                }
+
+                setProducts(allItems.slice(0, 10));
                 setLoading(false);
             } catch (error) {
-                console.error("Erreur chargement aperçu:", error);
+                console.error(error);
                 setLoading(false);
             }
         };
+
         fetchProducts();
     }, []);
 
     if (loading) return null;
 
     return (
-        // CHANGEMENT : Fond crème très léger (#FAF9F6) pour faire ressortir les cartes blanches
-        <section className="py-28 bg-[#FAF9F6] relative overflow-hidden font-body">
+        <section className="relative py-20 bg-[#FDFBF7] font-body overflow-hidden">
+            <div className="absolute top-0 left-0 w-full z-10 pointer-events-none opacity-100 drop-shadow-2xl">
+                <img src={waveBlue} alt="Vague décorative" className="w-full h-auto object-cover transform" />
+            </div>
 
-            {/* Titre */}
-            <motion.div
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-100px" }}
-                variants={fadeInUp}
-                className="max-w-7xl mx-auto px-4 mb-20 text-center relative z-10"
-            >
-                <span className="text-primary font-title font-bold uppercase tracking-widest text-sm mb-2 block opacity-80">
-                    — Coups de cœur —
-                </span>
-                <h2 className="font-title text-4xl md:text-6xl font-black text-slate-800 drop-shadow-sm">
-                    Le Défilé des <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-orange-400">Gourmandises</span>
-                </h2>
-            </motion.div>
+            <div className="max-w-7xl mx-auto px-4 relative z-20">
+                <div className="text-center mb-16">
+                    <span className="text-accent font-title font-bold tracking-widest uppercase text-sm">
+                        — La Sélection —
+                    </span>
+                    <h2 className="font-title text-4xl md:text-5xl font-black text-darker mt-2">
+                        Nos <span className="text-primary">Coups de Cœur</span>
+                    </h2>
+                </div>
+                
+                <div className="relative">
+                    <button
+                        ref={prevRef}
+                        className="hidden md:flex absolute top-1/2 -left-4 md:-left-12 z-30 -translate-y-1/2 w-14 h-14 bg-white rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-slate-100 items-center justify-center text-slate-700 transition-all duration-300 hover:scale-110 hover:bg-primary hover:text-white hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label="Précédent"
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                    </button>
 
-            {/* Carrousel */}
-            <motion.div
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-50px" }}
-                variants={fadeInUp}
-                transition={{ delay: 0.2 }}
-                className="max-w-full relative py-8"
-            >
-                <Marquee
-                    direction="right"
-                    speed={35} // Vitesse un peu plus lente pour apprécier le design
-                    gradient={true}
-                    gradientWidth={120}
-                    gradientColor="#FAF9F6" // IMPORTANT : Le dégradé matche la couleur de fond crème
-                    className="overflow-y-visible py-10" // overflow-visible pour ne pas couper les ombres
-                >
-                    {products.map((item) => (
-                        <div
-                            key={item.id}
-                            // DESIGN CARTE : Plus large, coins arrondis modernes, grosse ombre douce
-                            className="w-96 mx-8 bg-white rounded-[2.5rem] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.08)] hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] p-5 border border-slate-50 hover:border-orange-100 hover:-translate-y-2 transition-all duration-500 group cursor-pointer relative"
-                        >
-                            {/* Image Container */}
-                            <div className="h-72 w-full rounded-[2rem] overflow-hidden mb-6 relative shadow-inner">
-                                <img
-                                    src={item.image_url || "https://via.placeholder.com/300"}
-                                    alt={item.name}
-                                    className="w-full h-full object-cover transform group-hover:scale-110 group-hover:rotate-1 transition-transform duration-700 ease-in-out"
-                                />
+                    <button
+                        ref={nextRef}
+                        className="hidden md:flex absolute top-1/2 -right-4 md:-right-12 z-30 -translate-y-1/2 w-14 h-14 bg-white rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-slate-100 items-center justify-center text-slate-700 transition-all duration-300 hover:scale-110 hover:bg-primary hover:text-white hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label="Suivant"
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                    </button>
 
-                                {/* PRIX STICKER : Effet autocollant posé à la main */}
-                                <div className="absolute bottom-4 right-4 bg-white text-slate-800 font-title font-black text-lg px-4 py-2 rounded-full border-4 border-[#FAF9F6] shadow-lg transform -rotate-6 group-hover:rotate-0 group-hover:scale-110 transition-all duration-300">
-                                    {item.price} €
+                    <Swiper
+                        modules={[Navigation, Autoplay, Pagination]}
+                        onBeforeInit={(swiper) => {
+                            swiper.params.navigation.prevEl = prevRef.current;
+                            swiper.params.navigation.nextEl = nextRef.current;
+                        }}
+                        navigation={{
+                            prevEl: prevRef.current,
+                            nextEl: nextRef.current,
+                        }}
+                        pagination={{
+                            clickable: true,
+                            dynamicBullets: true
+                        }}
+                        speed={600}
+                        grabCursor={true}
+                        touchRatio={1.5}
+                        resistanceRatio={0.6}
+                        slidesPerView={1.15}
+                        centeredSlides={true}
+                        spaceBetween={20}
+                        loop={true}
+                        autoplay={{
+                            delay: 4000,
+                            disableOnInteraction: false,
+                            pauseOnMouseEnter: true
+                        }}
+                        breakpoints={{
+                            640: { 
+                                slidesPerView: 2, 
+                                spaceBetween: 20,
+                                centeredSlides: false
+                            },
+                            1024: { 
+                                slidesPerView: 3, 
+                                spaceBetween: 30,
+                                centeredSlides: false
+                            },
+                        }}
+                        className="!pb-16 !pt-4 !px-4"
+                    >
+                        {products.map((item, index) => (
+                            <SwiperSlide key={`${item.id}-${index}`} className="h-auto">
+                                <div className="group relative bg-white rounded-[2.5rem] shadow-lg hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300 border border-slate-100 h-full flex flex-col overflow-hidden">
+                                    {item.is_featured === 1 && (
+                                        <div className="absolute top-4 left-4 z-20">
+                                            <span className="bg-accent text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider transform -rotate-2 group-hover:rotate-0 transition-transform">
+                                                Coup de ❤️
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    <div className="h-64 w-full overflow-hidden relative bg-slate-50">
+                                        <img
+                                            src={item.image_url || "https://via.placeholder.com/400x300"}
+                                            alt={item.name}
+                                            className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-in-out"
+                                        />
+
+                                        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md text-darker font-title font-black text-xl px-4 py-2 rounded-2xl shadow-lg border border-slate-100 z-10">
+                                            {Math.floor(item.price)},<span className="text-sm">{(item.price % 1).toFixed(2).substring(2)}€</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-6 flex-grow flex flex-col items-center text-center">
+                                        <h3 className="font-title font-bold text-2xl text-darker mb-2 group-hover:text-primary transition-colors line-clamp-1">
+                                            {item.name}
+                                        </h3>
+                                        <p className="text-slate-500 font-medium text-sm leading-relaxed mb-6 line-clamp-2">
+                                            {item.description}
+                                        </p>
+
+                                        <div className="mt-auto w-full">
+                                            <Link to="/menu" className="flex items-center justify-center w-full py-4 bg-slate-50 text-slate-700 rounded-xl font-title font-bold hover:bg-darker hover:text-white transition-all duration-300 shadow-sm group-hover:shadow-md gap-2">
+                                                Commander
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                            </Link>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            </SwiperSlide>
+                        ))}
+                    </Swiper>
+                </div>
 
-                            {/* Contenu Texte */}
-                            <div className="px-2 pb-2 text-center">
-                                <h3 className="font-title font-bold text-2xl text-slate-800 mb-3 group-hover:text-primary transition-colors">
-                                    {item.name}
-                                </h3>
-                                <p className="text-slate-500 font-medium text-sm line-clamp-2 leading-relaxed px-4">
-                                    {item.description}
-                                </p>
+                <div className="text-center mt-12">
+                    <Link to="/menu" className="inline-block px-10 py-4 border-2 border-slate-200 text-darker rounded-full font-title font-bold text-lg hover:border-darker hover:bg-darker hover:text-white transition-all duration-300 shadow-sm hover:-translate-y-1">
+                        Explorer toute la Carte
+                    </Link>
+                </div>
 
-                                {/* Petit lien discret "Voir" */}
-                                <div className="mt-6 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300 text-primary font-bold text-sm uppercase tracking-wider">
-                                    Commander →
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </Marquee>
-            </motion.div>
-
-            {/* Bouton Action */}
-            <motion.div
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeInUp}
-                transition={{ delay: 0.4 }}
-                className="text-center mt-16 relative z-10"
-            >
-                <Link to="/menu" className="inline-flex items-center gap-3 bg-slate-900 text-white hover:bg-primary px-10 py-4 rounded-full font-title font-bold text-xl shadow-lg hover:shadow-primary/30 hover:scale-105 transition-all duration-300">
-                    Explorer toute la carte
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-                </Link>
-            </motion.div>
-
+            </div>
         </section>
     );
 };

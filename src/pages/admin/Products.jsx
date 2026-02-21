@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import AdminSidebar from './AdminSidebar.jsx';
 
 const Products = () => {
-    // --- 1. LES ÉTATS (STATE) ---
     const [products, setProducts] = useState([]);
-    const [categories, setCategories] = useState([]); // Pour la liste déroulante
+    const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const [showModal, setShowModal] = useState(false);
@@ -15,9 +14,9 @@ const Products = () => {
     const [price, setPrice] = useState('');
     const [categoryId, setCategoryId] = useState('');
 
-    const [isOutOfStock, setIsOutOfStock] = useState(false); // Rupture
-    const [isNew, setIsNew] = useState(false);             // Nouveauté
-    const [isFeatured, setIsFeatured] = useState(false);   // Mis en avant
+    const [isOutOfStock, setIsOutOfStock] = useState(false);
+    const [isNew, setIsNew] = useState(false);
+    const [isFeatured, setIsFeatured] = useState(false);
 
     const [image, setImage] = useState(null);
     const [previewImage, setPreviewImage] = useState(null);
@@ -25,8 +24,8 @@ const Products = () => {
     const fetchData = async () => {
         try {
             const [productsRes, categoriesRes] = await Promise.all([
-                fetch('http://localhost:3000/api/products'),
-                fetch('http://localhost:3000/api/categories')
+                fetch('/api/products'),
+                fetch('/api/categories')
             ]);
 
             const productsData = await productsRes.json();
@@ -66,9 +65,8 @@ const Products = () => {
         setName(product.name);
         setDescription(product.description || '');
         setPrice(product.price);
-        setCategoryId(product.category_id || ''); // Si null, on met chaîne vide
+        setCategoryId(product.category_id || '');
 
-        // Conversion des 0/1 (MySQL) en false/true (React)
         setIsOutOfStock(product.is_out_of_stock === 1);
         setIsNew(product.is_new === 1);
         setIsFeatured(product.is_featured === 1);
@@ -102,11 +100,11 @@ const Products = () => {
         if (image) formData.append('image', image);
 
         try {
-            let url = 'http://localhost:3000/api/products';
+            let url = '/api/products';
             let method = 'POST';
 
             if (editingProduct) {
-                url = `http://localhost:3000/api/products/${editingProduct.id}`;
+                url = `/api/products/${editingProduct.id}`;
                 method = 'PUT';
             }
 
@@ -129,7 +127,7 @@ const Products = () => {
     const handleDelete = async (id) => {
         if (!window.confirm("Supprimer ce produit ?")) return;
         try {
-            await fetch(`http://localhost:3000/api/products/${id}`, { method: 'DELETE' });
+            await fetch(`/api/products/${id}`, { method: 'DELETE' });
             fetchData();
         } catch (error) {
             console.error(error);

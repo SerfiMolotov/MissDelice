@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import mascot from '../../assets/images/LogoMC.png'; // Vérifie bien ce chemin
+import mascot from '../../assets/images/LogoMC.png';
+import waveBlue from '../../assets/images/wave-haikei (1).svg';
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 40 },
@@ -11,14 +12,16 @@ const AboutSection = () => {
     return (
         <section id="about" className="relative py-24 w-full overflow-hidden bg-cream font-body">
 
-            {/* Décor d'arrière-plan (inchangé car ça marche bien) */}
             <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/10 rounded-full blur-3xl z-0 pointer-events-none"></div>
             <div className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 w-[500px] h-[500px] bg-accent/10 rounded-full blur-3xl z-0 pointer-events-none"></div>
+
+            <div className="absolute bottom-0 left-0 w-full z-0 pointer-events-none opacity-100 drop-shadow-2xl">
+                <img src={waveBlue} alt="Vague décorative" className="w-full h-auto object-cover" />
+            </div>
 
             <div className="max-w-7xl mx-auto px-4 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
-                    {/* --- COLONNE GAUCHE : TEXTE HUMAIN --- */}
                     <motion.div
                         variants={fadeInUp}
                         initial="hidden"
@@ -31,7 +34,6 @@ const AboutSection = () => {
                                 La passion du goût,<br />
                                 <span className="relative inline-block z-10">
                                     au cœur de Livron.
-                                    {/* CORRECTION : Effet Surligneur (Highlighter) au lieu du trait bizarre */}
                                     <span className="absolute bottom-2 left-0 w-full h-4 bg-yellow-300/60 -z-10 -rotate-1 rounded-sm transform scale-110"></span>
                                 </span>
                             </h2>
@@ -40,20 +42,17 @@ const AboutSection = () => {
                         <div className="text-dark/80 text-lg font-medium leading-relaxed space-y-4">
                             <p>
                                 Bienvenue chez <span className="font-bold text-primary">Miss Délice</span> !
-                                Ici, pas de robots, juste de la passion. Installés Place Jean Jaurès, je prépare vos douceurs à la demande.
+                                Ici, tout est fait maison et avec le coeur ! Installés Place Jean Jaurès, je prépare vos douceurs à la demande.
                             </p>
                             <p>
                                 Que vous soyez team <span className="font-bold text-accent">Crêpe fondante</span> ou <span className="font-bold text-accent">Churros croustillant</span>,
-                                tout est fait avec amour (et beaucoup de gourmandise !).
+                                vous trouverez votre bonheur.
                             </p>
                         </div>
 
 
-                        {/* --- LES VALEURS (Version "Stickers" / Post-it) --- */}
-                        {/* Fini les carrés blancs d'entreprise, place au fun */}
                         <div className="flex flex-wrap justify-center lg:justify-start gap-6 pt-6">
 
-                            {/* Sticker 1 */}
                             <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-sm border-2 border-slate-100 rotate-[-3deg] hover:rotate-0 hover:scale-105 transition-all duration-300">
                                 <span className="text-2xl bg-red-100 p-2 rounded-full">🥚</span>
                                 <div className="text-left">
@@ -62,7 +61,6 @@ const AboutSection = () => {
                                 </div>
                             </div>
 
-                            {/* Sticker 2 */}
                             <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-sm border-2 border-slate-100 rotate-[2deg] hover:rotate-0 hover:scale-105 transition-all duration-300">
                                 <span className="text-2xl bg-blue-100 p-2 rounded-full">🍴</span>
                                 <div className="text-left">
@@ -74,8 +72,6 @@ const AboutSection = () => {
                         </div>
                     </motion.div>
 
-                    {/* --- COLONNE DROITE : VISUEL (Map + Mascotte) --- */}
-                    {/* On garde ça, c'était la partie réussie */}
                     <motion.div
                         initial={{ opacity: 0, x: 50 }}
                         whileInView={{ opacity: 1, x: 0 }}
@@ -89,18 +85,18 @@ const AboutSection = () => {
                                     title="Localisation Miss Délice"
                                     width="100%"
                                     height="100%"
-                                    style={{ border: 0, filter: "grayscale(0%)" }} // J'ai enlevé le filtre gris pour que ce soit plus joyeux
+                                    style={{ border: 0, filter: "grayscale(0%)" }}
                                     loading="lazy"
                                     allowFullScreen
-                                    src="http://maps.google.com/maps?q=6+Place+Jean+Jaures+26250+Livron-sur-Drome&z=15&output=embed" // Remets ton lien Google Maps valide ici
+                                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3485.207971576962!2d4.839198276674888!3d44.77218127934388!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x12b54f3019ac79f1%3A0xf134704ae3580c21!2sMiss%20D%C3%A9lice!5e1!3m2!1sfr!2sfr!4v1770299930707!5m2!1sfr!2sfr"
                                 >
                                 </iframe>
                             </div>
                         </div>
 
                         {/* La Mascotte */}
-                        <div className="absolute -bottom-10 -right-6 w-40 md:w-56 z-20 pointer-events-none drop-shadow-2xl animate-float-slow">
-                            <img src={mascot} alt="Laurie Miss Délice" className="w-full h-auto object-contain transform -rotate-6" />
+                        <div className="absolute -bottom-0 -right-16 w-40 md:w-56 z-20 pointer-events-none drop-shadow-2xl animate-float-slow">
+                            <img src={mascot} alt="Laurie Miss Délice" className="w-28 h-auto object-contain transform -rotate-6" />
                         </div>
 
                     </motion.div>

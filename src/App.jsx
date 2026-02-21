@@ -4,16 +4,18 @@ import Footer from "./components/layout/Footer.jsx";
 import ScrollToTop from './components/ScrollToTop';
 import Home from "./pages/Home.jsx";
 import Menu from "./pages/Menu.jsx";
-import AboutSection from "./components/home/AboutSection.jsx";
 import Dashboard from "./pages/admin/Dashboard.jsx";
 import Login from "./pages/admin/Login.jsx";
 import Categories from "./pages/admin/Categories.jsx";
 import Products from "./pages/admin/Products.jsx";
 import CartSidebar from "./components/CartSidebar.jsx";
+import AdminHours from "./pages/admin/AdminHours.jsx";
+import NotFound from "./pages/NotFound.jsx";
+import About from "./pages/About.jsx";
+import Legal from "./pages/Legal.jsx";
 
 const AppContent = () => {
     const location = useLocation();
-    // La logique pour cacher la navbar fonctionne maintenant car on est DANS le Router
     const isAdminPage = location.pathname.startsWith('/admin') || location.pathname === '/login';
 
     return (
@@ -25,12 +27,14 @@ const AppContent = () => {
                 <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/menu" element={<Menu />} />
-                    <Route path="/about" element={<AboutSection />} />
+                    <Route path="/about" element={<About />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/admin/dashboard" element={<Dashboard />} />
                     <Route path="/admin/categories" element={<Categories />} />
                     <Route path="/admin/products" element={<Products />} />
-
+                    <Route path="/admin/hours" element={<AdminHours />} />
+                    <Route path="/mentions-legales" element={<Legal />} />
+                    <Route path="*" element={<NotFound />} />
                 </Routes>
             </main>
 
