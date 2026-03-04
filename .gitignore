@@ -1,0 +1,47 @@
+# --- SECURITE ---
+backend/.env
+.env.local
+.env.*.local
+
+# --- DEPENDANCES ---
+node_modules/
+jspm_packages/
+
+# --- BUILDS ET OUTPUT ---
+dist/
+dist-ssr/
+build/
+.cache/
+.parcel-cache/
+
+# --- DOCKER ---
+.docker/
+# Ignorer les données de la base de données si tu les as montées en local
+mysql_data/
+db_data/
+
+# --- LOGS ---
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- SYSTEME & EDITEURS ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+Thumbs.db
+
+# --- TESTS ---
+/coverage
+.nyc_output
+backend/service-account.json

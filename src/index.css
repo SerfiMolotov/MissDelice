@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* On force le site à prendre 100% de la largeur réelle */
+:root, body, #root {
+    width: 100%;
+    max-width: 100vw;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden; /* Empêche le scroll horizontal inutile */
+}
+
+/* --- ANIMATIONS OPTIMISÉES (GPU) --- */
+
+/* Flottement (Fraise/Donut) */
+@keyframes floatY {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    33% { transform: translateY(-15px) rotate(10deg); }
+    66% { transform: translateY(-5px) rotate(-5deg); }
+}
+
+/* Blobs (Respiration) */
+@keyframes blobPulse {
+    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    33% { transform: translate(0, 20px) scale(1.1) rotate(5deg); }
+    66% { transform: translate(0, 0px) scale(1) rotate(-5deg); }
+}
+
+/* Confettis */
+@keyframes confettiFloat {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    33% { transform: translate(15px, -30px) rotate(180deg); }
+    66% { transform: translate(-10px, -15px) rotate(270deg); }
+    100% { transform: translate(0, 0) rotate(360deg); }
+}
+
+/* Classes utilitaires */
+.anim-float {
+    animation: floatY 6s ease-in-out infinite;
+    will-change: transform; /* Force l'accélération matérielle */
+}
+
+.anim-blob {
+    animation: blobPulse 15s ease-in-out infinite;
+    will-change: transform;
+}
+
+.anim-confetti {
+    animation: confettiFloat 8s linear infinite;
+    will-change: transform;
+}
+
+
+/* Texture "Grain" pour donner de la matière */
+.bg-grain {
+    position: relative;
+}
+.bg-grain::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    /* Bruit subtil */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* --- 3. ANIMATIONS GPU (Fluides) --- */
+
+@keyframes floatSlow {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-15px) rotate(2deg); }
+}
+
+@keyframes stickerFloat {
+    0%, 100% { transform: rotate(12deg) scale(1); }
+    50% { transform: rotate(15deg) scale(1.1); }
+}
+
+.anim-float {
+    animation: floatSlow 6s ease-in-out infinite;
+    will-change: transform;
+}
+
+.anim-sticker {
+    animation: stickerFloat 4s ease-in-out infinite;
+    will-change: transform;
+}

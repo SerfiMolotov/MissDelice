@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # --- Service 1 : Base de données ---
+  mysqldb:
+    image: mysql:8.0
+    container_name: miss_delice_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: miss_delice_db
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - app-network
+
+  # --- Service 2 : Interface de gestion BDD (Adminer) ---
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8101:8080"
+    networks:
+      - app-network
+
+  # --- Service 3 : Backend API ---
+  backend:
+    build: ./backend
+    container_name: miss_delice_backend
+    restart: always
+    ports:
+      - "3100:3000"
+    environment:
+      DB_HOST: mysqldb
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: miss_delice_db
+      PORT: 3000
+      JWT_SECRET: "7c2b4d9e1f8a3b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9"
+    # AJOUT IMPORTANT : Pour garder tes images uploadées
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - mysqldb
+    networks:
+      - app-network
+
+  # --- Service 4 : Frontend React ---
+  frontend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: miss_delice_frontend
+    restart: always
+    ports:
+      - "8100:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+volumes:
+  db_data:
+
+networks:
+  app-network:
+    driver: bridge
