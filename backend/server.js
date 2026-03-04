@@ -58,31 +58,34 @@ const uploadImageToSupabase = async (file, folder) => {
     if (!file) return null;
     
     const fileName = `${folder}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-    
-    console.log(`Tentative d'upload de l'image ${fileName} vers Supabase...`);
-    
-    // ✨ LA MAGIE EST ICI : On extrait un ArrayBuffer web propre à partir du Buffer Node.js
-    const arrayBuffer = file.buffer.buffer.slice(
-        file.buffer.byteOffset,
-        file.buffer.byteOffset + file.buffer.byteLength
-    );
-    
-    // On envoie le nouveau format "arrayBuffer" au lieu de "file.buffer"
-    const { data, error } = await supabase.storage
-        .from('images')
-        .upload(fileName, arrayBuffer, {
-            contentType: file.mimetype,
-            upsert: false
-        });
+    console.log(`[1] Début upload Supabase: ${fileName}`);
 
-    if (error) {
-        console.error("❌ Erreur upload Supabase :", error);
-        throw new Error("Erreur d'upload image: " + error.message);
+    try {
+        // ✨ LA MAGIE EST ICI : On transforme le vieux Buffer en Blob Web moderne !
+        const fileBlob = new Blob([file.buffer], { type: file.mimetype });
+        console.log(`[2] Blob créé avec succès, envoi à Supabase...`);
+
+        const { data, error } = await supabase.storage
+            .from('images')
+            .upload(fileName, fileBlob, {
+                contentType: file.mimetype,
+                upsert: false
+            });
+
+        if (error) {
+            console.error("❌ [3] Erreur Supabase interceptée :", error);
+            throw new Error("Erreur d'upload image: " + error.message);
+        }
+
+        console.log(`[4] Upload réussi dans le bucket !`);
+        const { data: urlData } = supabase.storage.from('images').getPublicUrl(fileName);
+        
+        return urlData.publicUrl;
+
+    } catch (err) {
+        console.error("🔥 [CRASH] Erreur fatale dans uploadImageToSupabase :", err.message);
+        throw err;
     }
-
-    const { data: urlData } = supabase.storage.from('images').getPublicUrl(fileName);
-    console.log(`✅ Image uploadée avec succès : ${urlData.publicUrl}`);
-    return urlData.publicUrl;
 };
 
 const deleteImageFromSupabase = async (imageUrl) => {
