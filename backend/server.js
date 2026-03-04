@@ -1,17 +1,15 @@
 /* eslint-env node */
-console.log("1. Démarrage du script server.js...");
+console.log("1. Démarrage du script server.js (Version Supabase)...");
 
 const express = require('express');
-const mysql = require('mysql2');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
-const fs = require('fs');
-
-console.log("2. Modules importés avec succès.");
+const { createClient } = require('@supabase/supabase-js');
+const { BetaAnalyticsDataClient } = require('@google-analytics/data');
 
 dotenv.config();
 
@@ -19,390 +17,352 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Gardé par sécurité si tu as encore de vieilles images en local
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-console.log("3. Tentative de connexion à la base de données...");
+console.log("2. Modules importés. Connexion à Supabase...");
 
-const db = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
+// Initialisation de Supabase
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_KEY
+);
 
-db.getConnection((err, connection) => {
-    if (err) {
-        console.error('❌ ERREUR MySQL :', err.message);
-    } else {
-        console.log('✅ SUCCÈS : Connecté à MySQL !');
-        connection.release();
+// ==========================================
+// 🚀 GESTION DES IMAGES (SPÉCIAL VERCEL & SUPABASE)
+// ==========================================
+// On utilise la mémoire RAM au lieu du disque dur, car Vercel n'a pas de disque dur persistant
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Fonction utilitaire pour envoyer une image vers Supabase Storage
+const uploadImageToSupabase = async (file, folder) => {
+    if (!file) return null;
+    
+    // Création d'un nom de fichier unique (ex: products/16789...-churros.jpg)
+    const fileName = `${folder}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+    
+    // Upload dans le bucket nommé 'images'
+    const { data, error } = await supabase.storage
+        .from('images')
+        .upload(fileName, file.buffer, {
+            contentType: file.mimetype,
+            upsert: false
+        });
+
+    if (error) throw new Error("Erreur d'upload image: " + error.message);
+
+    // On récupère le lien public complet
+    const { data: urlData } = supabase.storage.from('images').getPublicUrl(fileName);
+    return urlData.publicUrl;
+};
+
+// Fonction utilitaire pour supprimer une image de Supabase Storage
+const deleteImageFromSupabase = async (imageUrl) => {
+    if (!imageUrl || !imageUrl.includes('supabase.co')) return;
+    
+    // On extrait le chemin interne (après le /images/)
+    const urlParts = imageUrl.split('/images/');
+    if (urlParts.length > 1) {
+        const path = urlParts[1];
+        await supabase.storage.from('images').remove([path]);
     }
-});
+};
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        if (req.url.includes('categories')) {
-            cb(null, 'uploads/categories/');
-        }
-        else {
-            cb(null, 'uploads/products/');
-        }
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
-    }
-});
-const upload = multer({ storage: storage });
 
-app.post('/api/login', (req, res) => {
+// ==========================================
+// 🔐 AUTHENTIFICATION
+// ==========================================
+app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
 
-    const sql = "SELECT * FROM users WHERE username = ?";
-    db.query(sql, [username], async (err, results) => {
-        if (err) return res.status(500).json({ error: "Erreur serveur" });
+    const { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .single();
 
-        if (results.length === 0) {
-            return res.status(401).json({ error: "Utilisateur inconnu" });
-        }
-
-        const user = results[0];
-
-        const match = await bcrypt.compare(password, user.password);
-
-        if (match) {
-            const token = jwt.sign(
-                { id: user.id, username: user.username },
-                process.env.JWT_SECRET,
-                { expiresIn: '24h' }
-            );
-
-            res.json({ message: "Connexion réussie", token: token });
-        } else {
-            res.status(401).json({ error: "Mot de passe incorrect" });
-        }
-    });
-});
-
-app.get('/api/categories', (req, res) => {
-    const sql = "SELECT * FROM categories ORDER BY display_order ASC";
-    db.query(sql, (err, results) => {
-        if (err) {
-            console.error("Erreur SQL:", err);
-            return res.status(500).json({ error: "Erreur serveur" });
-        }
-
-        const categories = results.map(cat => ({
-            ...cat,
-            image_url: cat.image_url && cat.image_url.startsWith('http')
-                ? cat.image_url
-                : (cat.image_url ? `/uploads/categories/${cat.image_url}` : null)
-        }));
-        res.json(categories);
-    });
-});
-
-app.post('/api/categories', upload.single('image'), (req, res) => {
-    const { title, description } = req.body;
-    const imageFilename = req.file ? req.file.filename : null;
-
-    if (!title) {
-        return res.status(400).json({ error: "Le titre est obligatoire" });
+    if (error || !user) {
+        return res.status(401).json({ error: "Utilisateur inconnu" });
     }
 
-    const slug = title.toLowerCase()
-        .replace(/ /g, '-')
-        .replace(/[^\w-]+/g, '');
+    const match = await bcrypt.compare(password, user.password);
 
-    const descToSave = description || "";
-
-    const sql = "INSERT INTO categories (title, slug, description, image_url) VALUES (?, ?, ?, ?)";
-
-    db.query(sql, [title, slug, descToSave, imageFilename], (err, result) => {
-        if (err) {
-            console.error("Erreur insertion:", err);
-            return res.status(500).json({ error: err.message });
-        }
-        res.json({ id: result.insertId, title, slug, description: descToSave, image_url: imageFilename });
-    });
+    if (match) {
+        const token = jwt.sign(
+            { id: user.id, username: user.username },
+            process.env.JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+        res.json({ message: "Connexion réussie", token: token });
+    } else {
+        res.status(401).json({ error: "Mot de passe incorrect" });
+    }
 });
 
-app.delete('/api/categories/:id', (req, res) => {
+// ==========================================
+// 📂 CATÉGORIES
+// ==========================================
+app.get('/api/categories', async (req, res) => {
+    const { data: categories, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('display_order', { ascending: true });
+
+    if (error) return res.status(500).json({ error: "Erreur serveur" });
+
+    // On reformate pour garder la compatibilité avec ton frontend actuel
+    const formatedCategories = categories.map(cat => ({
+        ...cat,
+        image_url: cat.image_url && cat.image_url.startsWith('http')
+            ? cat.image_url
+            : (cat.image_url ? `/uploads/categories/${cat.image_url}` : null)
+    }));
+
+    res.json(formatedCategories);
+});
+
+app.post('/api/categories', upload.single('image'), async (req, res) => {
+    const { title, description } = req.body;
+    if (!title) return res.status(400).json({ error: "Le titre est obligatoire" });
+
+    const slug = title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+    
+    try {
+        const imageUrl = await uploadImageToSupabase(req.file, 'categories');
+
+        const { data, error } = await supabase.from('categories').insert([{
+            title, 
+            slug, 
+            description: description || "", 
+            image_url: imageUrl
+        }]).select().single();
+
+        if (error) throw error;
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/categories/:id', async (req, res) => {
     const { id } = req.params;
-
-    const sqlSelect = "SELECT image_url FROM categories WHERE id = ?";
-
-    db.query(sqlSelect, [id], (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (results.length === 0) return res.status(404).json({ error: "Catégorie non trouvée" });
-
-        const imageFilename = results[0].image_url;
-
-        if (imageFilename) {
-            const filePath = path.join(__dirname, 'uploads/categories', imageFilename);
-
-            fs.unlink(filePath, (err) => {
-                if (err) console.error("Erreur suppression image (peut-être déjà absente):", err);
-                else console.log("🗑️ Image supprimée du serveur :", imageFilename);
-            });
+    try {
+        const { data: cat } = await supabase.from('categories').select('image_url').eq('id', id).single();
+        if (cat && cat.image_url) {
+            await deleteImageFromSupabase(cat.image_url);
         }
 
-        const sqlDelete = "DELETE FROM categories WHERE id = ?";
-        db.query(sqlDelete, [id], (err, result) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: "Catégorie et image supprimées" });
-        });
-    });
+        const { error } = await supabase.from('categories').delete().eq('id', id);
+        if (error) throw error;
+        res.json({ message: "Catégorie supprimée" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-app.put('/api/categories/reorder', (req, res) => {
+app.put('/api/categories/reorder', async (req, res) => {
     const { newOrder } = req.body;
+    if (!newOrder || !Array.isArray(newOrder)) return res.status(400).json({ error: "Format invalide" });
 
-    if (!newOrder || !Array.isArray(newOrder)) {
-        return res.status(400).json({ error: "Format invalide" });
+    try {
+        const promises = newOrder.map((id, index) => 
+            supabase.from('categories').update({ display_order: index }).eq('id', id)
+        );
+        await Promise.all(promises);
+        res.json({ message: "Ordre mis à jour !" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-
-    const promises = newOrder.map((id, index) => {
-        return new Promise((resolve, reject) => {
-            const sql = "UPDATE categories SET display_order = ? WHERE id = ?";
-            db.query(sql, [index, id], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
-    });
-
-    Promise.all(promises)
-        .then(() => res.json({ message: "Ordre mis à jour !" }))
-        .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-
-app.put('/api/categories/:id', upload.single('image'), (req, res) => {
+app.put('/api/categories/:id', upload.single('image'), async (req, res) => {
     const { id } = req.params;
     const { title, description } = req.body;
-    const newImageFilename = req.file ? req.file.filename : null;
 
-    const sqlSelect = "SELECT * FROM categories WHERE id = ?";
-
-    db.query(sqlSelect, [id], (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (results.length === 0) return res.status(404).json({ error: "Catégorie non trouvée" });
-
-        const oldCategory = results[0];
-        let sqlUpdate;
-        let params;
+    try {
+        const { data: oldCategory } = await supabase.from('categories').select('*').eq('id', id).single();
+        if (!oldCategory) return res.status(404).json({ error: "Catégorie non trouvée" });
 
         const newSlug = title ? title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '') : oldCategory.slug;
+        let updateData = { title, slug: newSlug, description };
 
-        if (newImageFilename) {
-            if (oldCategory.image_url) {
-                const oldPath = path.join(__dirname, 'uploads/categories', oldCategory.image_url);
-                fs.unlink(oldPath, (err) => {
-                    if (err) console.log("Ancienne image non trouvée ou erreur suppression:", err.message);
-                });
-            }
-
-            sqlUpdate = "UPDATE categories SET title = ?, slug = ?, description = ?, image_url = ? WHERE id = ?";
-            params = [title, newSlug, description, newImageFilename, id];
-        }
-        else {
-            sqlUpdate = "UPDATE categories SET title = ?, slug = ?, description = ? WHERE id = ?";
-            params = [title, newSlug, description, id];
+        if (req.file) {
+            await deleteImageFromSupabase(oldCategory.image_url);
+            updateData.image_url = await uploadImageToSupabase(req.file, 'categories');
         }
 
-        db.query(sqlUpdate, params, (err, result) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: "Catégorie mise à jour avec succès" });
-        });
-    });
-});
-
-app.get('/api/products', (req, res) => {
-    const sql = `
-        SELECT p.*, c.title as category_title 
-        FROM products p 
-        LEFT JOIN categories c ON p.category_id = c.id 
-        ORDER BY p.display_order ASC, p.id DESC
-    `;
-
-    db.query(sql, (err, results) => {
-        if (err) return res.status(500).json({ error: "Erreur serveur" });
-
-        const products = results.map(prod => ({
-            ...prod,
-            image_url: prod.image_url
-                ? `/uploads/products/${prod.image_url}`
-                : null
-        }));
-        res.json(products);
-    });
-});
-
-app.post('/api/products', upload.single('image'), (req, res) => {
-
-    const { name, description, price, category_id, is_out_of_stock, is_new, is_featured } = req.body;
-    const imageFilename = req.file ? req.file.filename : null;
-
-    if (!name || !price) {
-        return res.status(400).json({ error: "Nom et prix obligatoires" });
+        const { error } = await supabase.from('categories').update(updateData).eq('id', id);
+        if (error) throw error;
+        res.json({ message: "Catégorie mise à jour avec succès" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-
-    const sql = `
-        INSERT INTO products 
-        (name, description, price, category_id, is_out_of_stock, is_new, is_featured, image_url) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const stockVal = is_out_of_stock === 'true' ? 1 : 0;
-    const newVal = is_new === 'true' ? 1 : 0;
-    const featVal = is_featured === 'true' ? 1 : 0;
-
-    db.query(sql, [name, description, price, category_id, stockVal, newVal, featVal, imageFilename], (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: err.message });
-        }
-        res.json({ id: result.insertId, message: "Produit créé !" });
-    });
 });
 
-app.put('/api/products/:id', upload.single('image'), (req, res) => {
+// ==========================================
+// 🍩 PRODUITS
+// ==========================================
+app.get('/api/products', async (req, res) => {
+    // Equivalent du LEFT JOIN en Supabase
+    const { data: products, error } = await supabase
+        .from('products')
+        .select(`
+            *,
+            categories (title)
+        `)
+        .order('display_order', { ascending: true })
+        .order('id', { ascending: false });
+
+    if (error) return res.status(500).json({ error: "Erreur serveur" });
+
+    // On reformate pour le frontend
+    const formatedProducts = products.map(prod => ({
+        ...prod,
+        category_title: prod.categories ? prod.categories.title : null,
+        image_url: prod.image_url && prod.image_url.startsWith('http')
+            ? prod.image_url
+            : (prod.image_url ? `/uploads/products/${prod.image_url}` : null)
+    }));
+    
+    // Nettoyage de l'objet imbriqué créé par Supabase
+    formatedProducts.forEach(p => delete p.categories);
+
+    res.json(formatedProducts);
+});
+
+app.post('/api/products', upload.single('image'), async (req, res) => {
+    const { name, description, price, category_id, is_out_of_stock, is_new, is_featured } = req.body;
+    if (!name || !price) return res.status(400).json({ error: "Nom et prix obligatoires" });
+
+    try {
+        const imageUrl = await uploadImageToSupabase(req.file, 'products');
+
+        const { data, error } = await supabase.from('products').insert([{
+            name, 
+            description, 
+            price, 
+            category_id, 
+            is_out_of_stock: is_out_of_stock === 'true', 
+            is_new: is_new === 'true', 
+            is_featured: is_featured === 'true', 
+            image_url: imageUrl
+        }]).select().single();
+
+        if (error) throw error;
+        res.json({ id: data.id, message: "Produit créé !" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     const { id } = req.params;
     const { name, description, price, category_id, is_out_of_stock, is_new, is_featured } = req.body;
-    const newImageFilename = req.file ? req.file.filename : null;
 
-    const sqlSelect = "SELECT * FROM products WHERE id = ?";
-    db.query(sqlSelect, [id], (err, results) => {
-        if (err || results.length === 0) return res.status(404).json({ error: "Produit introuvable" });
+    try {
+        const { data: oldProduct } = await supabase.from('products').select('*').eq('id', id).single();
+        if (!oldProduct) return res.status(404).json({ error: "Produit introuvable" });
 
-        const oldProduct = results[0];
-        let sqlUpdate;
-        let params;
+        let updateData = {
+            name, 
+            description, 
+            price, 
+            category_id,
+            is_out_of_stock: is_out_of_stock === 'true',
+            is_new: is_new === 'true',
+            is_featured: is_featured === 'true'
+        };
 
-        const stockVal = is_out_of_stock === 'true' ? 1 : 0;
-        const newVal = is_new === 'true' ? 1 : 0;
-        const featVal = is_featured === 'true' ? 1 : 0;
-
-        if (newImageFilename) {
-            if (oldProduct.image_url) {
-                const oldPath = path.join(__dirname, 'uploads/products', oldProduct.image_url);
-                fs.unlink(oldPath, (e) => { if(e) console.log(e); });
-            }
-            sqlUpdate = `UPDATE products SET name=?, description=?, price=?, category_id=?, is_out_of_stock=?, is_new=?, is_featured=?, image_url=? WHERE id=?`;
-            params = [name, description, price, category_id, stockVal, newVal, featVal, newImageFilename, id];
-        } else {
-            sqlUpdate = `UPDATE products SET name=?, description=?, price=?, category_id=?, is_out_of_stock=?, is_new=?, is_featured=? WHERE id=?`;
-            params = [name, description, price, category_id, stockVal, newVal, featVal, id];
+        if (req.file) {
+            await deleteImageFromSupabase(oldProduct.image_url);
+            updateData.image_url = await uploadImageToSupabase(req.file, 'products');
         }
 
-        db.query(sqlUpdate, params, (err) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: "Produit mis à jour" });
-        });
-    });
+        const { error } = await supabase.from('products').update(updateData).eq('id', id);
+        if (error) throw error;
+        res.json({ message: "Produit mis à jour" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-app.delete('/api/products/:id', (req, res) => {
-    const { id } = req.params;
-
-    db.query("SELECT image_url FROM products WHERE id = ?", [id], (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (results.length > 0 && results[0].image_url) {
-            const filePath = path.join(__dirname, 'uploads/products', results[0].image_url);
-            fs.unlink(filePath, () => {});
+app.delete('/api/products/:id', async (req, res) => {
+    try {
+        const { data: prod } = await supabase.from('products').select('image_url').eq('id', req.params.id).single();
+        if (prod && prod.image_url) {
+            await deleteImageFromSupabase(prod.image_url);
         }
 
-        db.query("DELETE FROM products WHERE id = ?", [id], (err) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: "Produit supprimé" });
-        });
-    });
+        const { error } = await supabase.from('products').delete().eq('id', req.params.id);
+        if (error) throw error;
+        res.json({ message: "Produit supprimé" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// ROUTES POUR LES RÉGLAGES
-
-app.get('/api/settings/saturday', (req, res) => {
-    const sql = "SELECT setting_value FROM settings WHERE setting_key = 'saturday_open'";
-    db.query(sql, (err, result) => {
-        if (err) return res.status(500).json(err);
-        if (result.length > 0) {
-            const isOpen = result[0].setting_value === 'true';
-            return res.json({ isOpen });
-        }
-        return res.json({ isOpen: false });
-    });
+// ==========================================
+// ⚙️ RÉGLAGES
+// ==========================================
+app.get('/api/settings/saturday', async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('settings').select('setting_value').eq('setting_key', 'saturday_open').single();
+        if (error || !data) return res.json({ isOpen: false });
+        res.json({ isOpen: data.setting_value === 'true' });
+    } catch (err) {
+        res.json({ isOpen: false });
+    }
 });
 
-app.put('/api/settings/saturday', (req, res) => {
+app.put('/api/settings/saturday', async (req, res) => {
     const { isOpen } = req.body;
-    const valueStr = isOpen ? 'true' : 'false';
-
-    const sql = "UPDATE settings SET setting_value = ? WHERE setting_key = 'saturday_open'";
-    db.query(sql, [valueStr], (err, result) => {
-        if (err) return res.status(500).json(err);
-        return res.json({ message: "Horaire samedi mis à jour", isOpen });
-    });
+    const { error } = await supabase
+        .from('settings')
+        .update({ setting_value: isOpen ? 'true' : 'false' })
+        .eq('setting_key', 'saturday_open');
+        
+    if (error) return res.status(500).json(error);
+    res.json({ message: "Horaire samedi mis à jour", isOpen });
 });
 
-app.get('/api/categories/:id/supplements', (req, res) => {
-    const sql = "SELECT * FROM supplements WHERE category_id = ?";
-    db.query(sql, [req.params.id], (err, result) => {
-        if (err) return res.status(500).json(err);
-        res.json(result);
-    });
+// ==========================================
+// ✨ SUPPLÉMENTS
+// ==========================================
+app.get('/api/categories/:id/supplements', async (req, res) => {
+    const { data, error } = await supabase.from('supplements').select('*').eq('category_id', req.params.id);
+    if (error) return res.status(500).json(error);
+    res.json(data);
 });
 
-app.post('/api/supplements', (req, res) => {
+app.post('/api/supplements', async (req, res) => {
     const { category_id, name, price, icon } = req.body;
-    const sql = "INSERT INTO supplements (category_id, name, price, icon) VALUES (?, ?, ?, ?)";
-    db.query(sql, [category_id, name, price, icon], (err, result) => {
-        if (err) return res.status(500).json(err);
-        res.json({ id: result.insertId, message: "Supplément ajouté" });
-    });
+    const { data, error } = await supabase.from('supplements').insert([{ category_id, name, price, icon }]).select().single();
+    if (error) return res.status(500).json(error);
+    res.json({ id: data.id, message: "Supplément ajouté" });
 });
 
-app.delete('/api/supplements/:id', (req, res) => {
-    const sql = "DELETE FROM supplements WHERE id = ?";
-    db.query(sql, [req.params.id], (err, result) => {
-        if (err) return res.status(500).json(err);
-        res.json({ message: "Supplément supprimé" });
-    });
+app.delete('/api/supplements/:id', async (req, res) => {
+    const { error } = await supabase.from('supplements').delete().eq('id', req.params.id);
+    if (error) return res.status(500).json(error);
+    res.json({ message: "Supplément supprimé" });
 });
 
-
-const { BetaAnalyticsDataClient } = require('@google-analytics/data');
-
+// ==========================================
+// 📊 ANALYTICS
+// ==========================================
 const analyticsClient = new BetaAnalyticsDataClient({
     keyFilename: './service-account.json',
 });
-
 const PROPERTY_ID = '522372058';
 
 app.get('/api/analytics', async (req, res) => {
     try {
-        console.log("🔍 Récupération des stats Analytics...");
-
         const [response] = await analyticsClient.runReport({
             property: `properties/${PROPERTY_ID}`,
-            dateRanges: [
-                {
-                    startDate: '7daysAgo',
-                    endDate: 'today',
-                },
-            ],
-            metrics: [
-                { name: 'activeUsers' },
-                { name: 'screenPageViews' },
-            ],
-            dimensions: [
-                { name: 'date' },
-            ],
-            orderBys: [
-                { dimension: { orderType: 'ALPHANUMERIC', dimensionName: 'date' } }
-            ]
+            dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }],
+            metrics: [{ name: 'activeUsers' }, { name: 'screenPageViews' }],
+            dimensions: [{ name: 'date' }],
+            orderBys: [{ dimension: { orderType: 'ALPHANUMERIC', dimensionName: 'date' } }]
         });
 
         const chartData = response.rows ? response.rows.map(row => ({
@@ -414,36 +374,21 @@ app.get('/api/analytics', async (req, res) => {
         const totalUsers = chartData.reduce((acc, curr) => acc + curr.users, 0);
         const totalViews = chartData.reduce((acc, curr) => acc + curr.views, 0);
 
-        console.log("✅ Stats récupérées avec succès !");
-
-        res.json({
-            success: true,
-            summary: {
-                users: totalUsers,
-                views: totalViews,
-            },
-            chart: chartData
-        });
-
+        res.json({ success: true, summary: { users: totalUsers, views: totalViews }, chart: chartData });
     } catch (error) {
-        console.error("❌ Erreur Analytics:", error.message);
-        res.json({
-            success: false,
-            error: error.message,
-            summary: { users: 0, views: 0 },
-            chart: []
-        });
+        res.json({ success: false, error: error.message, summary: { users: 0, views: 0 }, chart: [] });
     }
 });
 
-// --- GESTION DES HORAIRES ---
+// ==========================================
+// 🕒 HORAIRES
+// ==========================================
 app.get('/api/hours', async (req, res) => {
     try {
-        // AJOUT DE .promise() ICI 👇
-        const [rows] = await db.promise().query('SELECT * FROM opening_hours ORDER BY day_order ASC');
-        res.json(rows);
+        const { data, error } = await supabase.from('opening_hours').select('*').order('day_order', { ascending: true });
+        if (error) throw error;
+        res.json(data);
     } catch (error) {
-        console.error("ERREUR SQL CRITIQUE dans /api/hours :", error.message);
         res.status(500).json({ error: "Erreur serveur lors de la lecture des horaires." });
     }
 });
@@ -451,19 +396,19 @@ app.get('/api/hours', async (req, res) => {
 app.put('/api/hours', async (req, res) => {
     const hoursData = req.body;
     try {
-        for (const day of hoursData) {
-            await db.promise().query(
-                'UPDATE opening_hours SET is_closed = ?, hours_text = ? WHERE id = ?',
-                [day.is_closed, day.hours_text, day.id]
-            );
-        }
+        const promises = hoursData.map(day => 
+            supabase.from('opening_hours').update({ is_closed: day.is_closed, hours_text: day.hours_text }).eq('id', day.id)
+        );
+        await Promise.all(promises);
         res.json({ success: true, message: "Horaires mis à jour !" });
     } catch (error) {
-        console.error("ERREUR SQL CRITIQUE (PUT /api/hours) :", error.message);
         res.status(500).json({ error: "Erreur lors de la sauvegarde des horaires." });
     }
 });
 
+// ==========================================
+// 🚀 DÉMARRAGE DU SERVEUR
+// ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 SUCCÈS : Serveur démarré sur http://localhost:${PORT}`);
