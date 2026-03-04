@@ -61,9 +61,16 @@ const uploadImageToSupabase = async (file, folder) => {
     
     console.log(`Tentative d'upload de l'image ${fileName} vers Supabase...`);
     
+    // ✨ LA MAGIE EST ICI : On extrait un ArrayBuffer web propre à partir du Buffer Node.js
+    const arrayBuffer = file.buffer.buffer.slice(
+        file.buffer.byteOffset,
+        file.buffer.byteOffset + file.buffer.byteLength
+    );
+    
+    // On envoie le nouveau format "arrayBuffer" au lieu de "file.buffer"
     const { data, error } = await supabase.storage
         .from('images')
-        .upload(fileName, file.buffer, {
+        .upload(fileName, arrayBuffer, {
             contentType: file.mimetype,
             upsert: false
         });
