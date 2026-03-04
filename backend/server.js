@@ -409,7 +409,19 @@ app.put('/api/hours', async (req, res) => {
 // ==========================================
 // 🚀 DÉMARRAGE DU SERVEUR
 // ==========================================
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 SUCCÈS : Serveur démarré sur http://localhost:${PORT}`);
-});
+
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`🚀 Serveur local démarré sur http://localhost:${PORT}`);
+    });
+}
+
+// 2. Export de l'application pour Vercel (Mode Serverless)
+module.exports = app;
+
+module.exports.config = {
+    api: {
+        bodyParser: false,
+    },
+};
