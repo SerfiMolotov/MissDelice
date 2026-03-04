@@ -55,33 +55,40 @@ const uploadImageToSupabase = async (filePath, originalName, mimeType, folder) =
     if (!filePath) return null;
     
     const fileName = `${folder}/${Date.now()}-${originalName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-    console.log(`[1] Lecture du fichier temporaire pour: ${fileName}`);
+    console.log(`[STEP 1] Lecture asynchrone de : ${filePath}`);
 
     try {
-        const fileContent = fs.readFileSync(filePath);
-        console.log(`[2] Fichier lu. Envoi à Supabase...`);
+        // 1. Lecture asynchrone (empêche Vercel de tuer le processus pour "timeout")
+        const buffer = await fs.promises.readFile(filePath);
+        console.log(`[STEP 2] Fichier lu (${buffer.length} octets). Conversion en Web Buffer...`);
 
+        // 2. LA MAGIE POUR VERCEL : On force le format ArrayBuffer Web natif
+        const arrayBuffer = new Uint8Array(buffer).buffer;
+        console.log(`[STEP 3] Conversion réussie ! Envoi vers Supabase...`);
+
+        // 3. Envoi sur le Cloud
         const { data, error } = await supabase.storage
             .from('images')
-            .upload(fileName, fileContent, {
+            .upload(fileName, arrayBuffer, {
                 contentType: mimeType,
                 upsert: false
             });
 
         if (error) {
-            console.error("❌ [3] Erreur Supabase interceptée :", error);
-            throw new Error("Erreur d'upload image: " + error.message);
+            console.error("❌ [STEP 4] Supabase a refusé l'image :", error);
+            throw error;
         }
 
-        console.log(`[4] Upload réussi dans le bucket !`);
+        console.log(`[STEP 5] Upload 100% terminé ! Génération du lien public...`);
         const { data: urlData } = supabase.storage.from('images').getPublicUrl(fileName);
         
-        // Nettoyage : On supprime le fichier temporaire de Vercel pour faire propre
-        fs.unlinkSync(filePath);
+        // Nettoyage propre
+        await fs.promises.unlink(filePath).catch(() => {});
         
         return urlData.publicUrl;
     } catch (err) {
-        console.error("🔥 [CRASH] Erreur fatale dans uploadImageToSupabase :", err.message);
+        // Si Vercel plante ici, on verra toute la pile d'erreur (stack trace)
+        console.error("🔥 [CRASH FATAL] Erreur uploadImageToSupabase :", err.stack || err);
         throw err;
     }
 };
