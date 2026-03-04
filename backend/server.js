@@ -1,14 +1,14 @@
 /* eslint-env node */
-console.log("1. Démarrage du script server.js (Version Supabase/Vercel)...");
+console.log("1. Démarrage du script server.js (Version Supabase/Vercel avec Multiparty)...");
 
+const multiparty = require('multiparty');
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const multer = require('multer');
-const fs = require('fs'); // Ajouté pour vérifier l'existence des fichiers
+const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 const { BetaAnalyticsDataClient } = require('@google-analytics/data');
 
@@ -48,27 +48,23 @@ try {
     console.log("⚠️ Erreur initialisation Analytics :", e.message);
 }
 
-
 // ==========================================
-// 🚀 GESTION DES IMAGES (SPÉCIAL VERCEL & SUPABASE)
+// 🚀 GESTION DES IMAGES (SPÉCIAL VERCEL avec MULTIPARTY)
 // ==========================================
-const upload = multer({ storage: multer.memoryStorage() });
-
-const uploadImageToSupabase = async (file, folder) => {
-    if (!file) return null;
+const uploadImageToSupabase = async (filePath, originalName, mimeType, folder) => {
+    if (!filePath) return null;
     
-    const fileName = `${folder}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-    console.log(`[1] Début upload Supabase: ${fileName}`);
+    const fileName = `${folder}/${Date.now()}-${originalName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+    console.log(`[1] Lecture du fichier temporaire pour: ${fileName}`);
 
     try {
-        // ✨ LA MAGIE EST ICI : On transforme le vieux Buffer en Blob Web moderne !
-        const fileBlob = new Blob([file.buffer], { type: file.mimetype });
-        console.log(`[2] Blob créé avec succès, envoi à Supabase...`);
+        const fileContent = fs.readFileSync(filePath);
+        console.log(`[2] Fichier lu. Envoi à Supabase...`);
 
         const { data, error } = await supabase.storage
             .from('images')
-            .upload(fileName, fileBlob, {
-                contentType: file.mimetype,
+            .upload(fileName, fileContent, {
+                contentType: mimeType,
                 upsert: false
             });
 
@@ -80,8 +76,10 @@ const uploadImageToSupabase = async (file, folder) => {
         console.log(`[4] Upload réussi dans le bucket !`);
         const { data: urlData } = supabase.storage.from('images').getPublicUrl(fileName);
         
+        // Nettoyage : On supprime le fichier temporaire de Vercel pour faire propre
+        fs.unlinkSync(filePath);
+        
         return urlData.publicUrl;
-
     } catch (err) {
         console.error("🔥 [CRASH] Erreur fatale dans uploadImageToSupabase :", err.message);
         throw err;
@@ -96,7 +94,6 @@ const deleteImageFromSupabase = async (imageUrl) => {
         await supabase.storage.from('images').remove([filePath]);
     }
 };
-
 
 // ==========================================
 // 🔐 AUTHENTIFICATION
@@ -130,46 +127,65 @@ app.get('/api/categories', async (req, res) => {
     res.json(formatedCategories);
 });
 
-app.post('/api/categories', upload.single('image'), async (req, res) => {
-    try {
-        const { title, description } = req.body;
-        if (!title) return res.status(400).json({ error: "Le titre est obligatoire" });
+app.post('/api/categories', async (req, res) => {
+    const form = new multiparty.Form();
+    form.parse(req, async (err, fields, files) => {
+        if (err) return res.status(500).json({ error: err.message });
 
-        const slug = title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
-        const imageUrl = await uploadImageToSupabase(req.file, 'categories');
+        try {
+            const title = fields.title ? fields.title[0] : null;
+            const description = fields.description ? fields.description[0] : "";
+            
+            if (!title) return res.status(400).json({ error: "Le titre est obligatoire" });
+            const slug = title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
 
-        const { data, error } = await supabase.from('categories').insert([{ title, slug, description: description || "", image_url: imageUrl }]).select().single();
-        if (error) throw error;
-        res.json(data);
-    } catch (err) {
-        console.error("🔥 ERREUR POST CATEGORIE:", err);
-        res.status(500).json({ error: err.message });
-    }
+            let imageUrl = null;
+            if (files.image && files.image.length > 0) {
+                const f = files.image[0];
+                imageUrl = await uploadImageToSupabase(f.path, f.originalFilename, f.headers['content-type'], 'categories');
+            }
+
+            const { data, error } = await supabase.from('categories').insert([{ title, slug, description, image_url: imageUrl }]).select().single();
+            if (error) throw error;
+            res.json(data);
+        } catch (error) {
+            console.error("🔥 ERREUR POST CATEGORIE:", error);
+            res.status(500).json({ error: error.message });
+        }
+    });
 });
 
-app.put('/api/categories/:id', upload.single('image'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { title, description } = req.body;
+app.put('/api/categories/:id', async (req, res) => {
+    const { id } = req.params;
+    const form = new multiparty.Form();
 
-        const { data: oldCategory } = await supabase.from('categories').select('*').eq('id', id).single();
-        if (!oldCategory) return res.status(404).json({ error: "Catégorie non trouvée" });
+    form.parse(req, async (err, fields, files) => {
+        if (err) return res.status(500).json({ error: err.message });
 
-        const newSlug = title ? title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '') : oldCategory.slug;
-        let updateData = { title, slug: newSlug, description };
+        try {
+            const title = fields.title ? fields.title[0] : null;
+            const description = fields.description ? fields.description[0] : "";
 
-        if (req.file) {
-            await deleteImageFromSupabase(oldCategory.image_url);
-            updateData.image_url = await uploadImageToSupabase(req.file, 'categories');
+            const { data: oldCategory } = await supabase.from('categories').select('*').eq('id', id).single();
+            if (!oldCategory) return res.status(404).json({ error: "Catégorie non trouvée" });
+
+            const newSlug = title ? title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '') : oldCategory.slug;
+            let updateData = { title, slug: newSlug, description };
+
+            if (files.image && files.image.length > 0) {
+                const f = files.image[0];
+                await deleteImageFromSupabase(oldCategory.image_url);
+                updateData.image_url = await uploadImageToSupabase(f.path, f.originalFilename, f.headers['content-type'], 'categories');
+            }
+
+            const { error } = await supabase.from('categories').update(updateData).eq('id', id);
+            if (error) throw error;
+            res.json({ message: "Catégorie mise à jour avec succès" });
+        } catch (error) {
+            console.error("🔥 ERREUR PUT CATEGORIE:", error);
+            res.status(500).json({ error: error.message });
         }
-
-        const { error } = await supabase.from('categories').update(updateData).eq('id', id);
-        if (error) throw error;
-        res.json({ message: "Catégorie mise à jour avec succès" });
-    } catch (err) {
-        console.error("🔥 ERREUR PUT CATEGORIE:", err);
-        res.status(500).json({ error: err.message });
-    }
+    });
 });
 
 app.put('/api/categories/reorder', async (req, res) => {
@@ -211,49 +227,79 @@ app.get('/api/products', async (req, res) => {
     res.json(formatedProducts);
 });
 
-app.post('/api/products', upload.single('image'), async (req, res) => {
-    try {
-        const { name, description, price, category_id, is_out_of_stock, is_new, is_featured } = req.body;
-        if (!name || !price) return res.status(400).json({ error: "Nom et prix obligatoires" });
+app.post('/api/products', async (req, res) => {
+    const form = new multiparty.Form();
 
-        const imageUrl = await uploadImageToSupabase(req.file, 'products');
+    form.parse(req, async (err, fields, files) => {
+        if (err) return res.status(500).json({ error: err.message });
 
-        const { data, error } = await supabase.from('products').insert([{
-            name, description, price, category_id, 
-            is_out_of_stock: is_out_of_stock === 'true', is_new: is_new === 'true', is_featured: is_featured === 'true', 
-            image_url: imageUrl
-        }]).select().single();
+        try {
+            const name = fields.name ? fields.name[0] : null;
+            const price = fields.price ? fields.price[0] : null;
+            const description = fields.description ? fields.description[0] : "";
+            const category_id = fields.category_id ? fields.category_id[0] : null;
+            const is_out_of_stock = fields.is_out_of_stock ? fields.is_out_of_stock[0] : 'false';
+            const is_new = fields.is_new ? fields.is_new[0] : 'false';
+            const is_featured = fields.is_featured ? fields.is_featured[0] : 'false';
 
-        if (error) throw error;
-        res.json({ id: data.id, message: "Produit créé !" });
-    } catch (err) {
-        console.error("🔥 ERREUR POST PRODUIT:", err);
-        res.status(500).json({ error: err.message });
-    }
+            if (!name || !price) return res.status(400).json({ error: "Nom et prix obligatoires" });
+
+            let imageUrl = null;
+            if (files.image && files.image.length > 0) {
+                const f = files.image[0];
+                imageUrl = await uploadImageToSupabase(f.path, f.originalFilename, f.headers['content-type'], 'products');
+            }
+
+            const { data, error } = await supabase.from('products').insert([{
+                name, description, price, category_id, 
+                is_out_of_stock: is_out_of_stock === 'true', is_new: is_new === 'true', is_featured: is_featured === 'true', 
+                image_url: imageUrl
+            }]).select().single();
+
+            if (error) throw error;
+            res.json({ id: data.id, message: "Produit créé !" });
+        } catch (error) {
+            console.error("🔥 ERREUR POST PRODUIT:", error);
+            res.status(500).json({ error: error.message });
+        }
+    });
 });
 
-app.put('/api/products/:id', upload.single('image'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { name, description, price, category_id, is_out_of_stock, is_new, is_featured } = req.body;
+app.put('/api/products/:id', async (req, res) => {
+    const { id } = req.params;
+    const form = new multiparty.Form();
 
-        const { data: oldProduct } = await supabase.from('products').select('*').eq('id', id).single();
-        if (!oldProduct) return res.status(404).json({ error: "Produit introuvable" });
+    form.parse(req, async (err, fields, files) => {
+        if (err) return res.status(500).json({ error: err.message });
 
-        let updateData = { name, description, price, category_id, is_out_of_stock: is_out_of_stock === 'true', is_new: is_new === 'true', is_featured: is_featured === 'true' };
+        try {
+            const name = fields.name ? fields.name[0] : null;
+            const price = fields.price ? fields.price[0] : null;
+            const description = fields.description ? fields.description[0] : "";
+            const category_id = fields.category_id ? fields.category_id[0] : null;
+            const is_out_of_stock = fields.is_out_of_stock ? fields.is_out_of_stock[0] : 'false';
+            const is_new = fields.is_new ? fields.is_new[0] : 'false';
+            const is_featured = fields.is_featured ? fields.is_featured[0] : 'false';
 
-        if (req.file) {
-            await deleteImageFromSupabase(oldProduct.image_url);
-            updateData.image_url = await uploadImageToSupabase(req.file, 'products');
+            const { data: oldProduct } = await supabase.from('products').select('*').eq('id', id).single();
+            if (!oldProduct) return res.status(404).json({ error: "Produit introuvable" });
+
+            let updateData = { name, description, price, category_id, is_out_of_stock: is_out_of_stock === 'true', is_new: is_new === 'true', is_featured: is_featured === 'true' };
+
+            if (files.image && files.image.length > 0) {
+                const f = files.image[0];
+                await deleteImageFromSupabase(oldProduct.image_url);
+                updateData.image_url = await uploadImageToSupabase(f.path, f.originalFilename, f.headers['content-type'], 'products');
+            }
+
+            const { error } = await supabase.from('products').update(updateData).eq('id', id);
+            if (error) throw error;
+            res.json({ message: "Produit mis à jour" });
+        } catch (error) {
+            console.error("🔥 ERREUR PUT PRODUIT:", error);
+            res.status(500).json({ error: error.message });
         }
-
-        const { error } = await supabase.from('products').update(updateData).eq('id', id);
-        if (error) throw error;
-        res.json({ message: "Produit mis à jour" });
-    } catch (err) {
-        console.error("🔥 ERREUR PUT PRODUIT:", err);
-        res.status(500).json({ error: err.message });
-    }
+    });
 });
 
 app.delete('/api/products/:id', async (req, res) => {
@@ -340,7 +386,7 @@ if (process.env.NODE_ENV !== 'production') {
     });
 }
 
-// Configuration Vercel Serverless & Multer
+// Configuration Vercel Serverless
 module.exports = app;
 module.exports.config = {
     api: { bodyParser: false },
