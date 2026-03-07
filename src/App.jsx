@@ -1,4 +1,5 @@
 import {BrowserRouter, Routes, Route, useLocation} from 'react-router-dom';
+import { Analytics } from "@vercel/analytics/react";
 import Navbar from "./components/layout/Navbar.jsx";
 import Footer from "./components/layout/Footer.jsx";
 import ScrollToTop from './components/ScrollToTop';
@@ -39,6 +40,7 @@ const AppContent = () => {
             </main>
 
             {!isAdminPage && <Footer />}
+            <Analytics />
         </div>
     );
 };
