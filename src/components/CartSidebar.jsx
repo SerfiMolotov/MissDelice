@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 
 const CartSidebar = () => {
-    const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, addToCart, getCartTotal, clearCart } = useCart();
+    const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, addToCart, getCartTotal, clearCart, getCartCount } = useCart();
 
     const [formData, setFormData] = useState({
         name: '',
@@ -20,27 +20,24 @@ const CartSidebar = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [orderSuccess, setOrderSuccess] = useState(false);
 
-    // --- GÉNÉRATEUR DE CRÉNEAUX HORAIRES (Logique Complexe) ---
+    // --- GÉNÉRATEUR DE CRÉNEAUX HORAIRES ---
     useEffect(() => {
         const generateSlots = () => {
             const slots = [];
             const now = new Date();
-            const currentHour = now.getHours();
-            const currentMin = now.getMinutes();
             const day = now.getDay();
 
-            if (day === 2) return [];
+            if (day === 2) return []; // Fermé le mardi
 
             const startHour = 14;
             const endHour = 18;
 
             for (let h = startHour; h < endHour; h++) {
                 for (let m = 0; m < 60; m += 15) {
-                    // Création de l'heure du créneau
                     const slotTime = new Date();
                     slotTime.setHours(h, m, 0);
 
-                    const bufferTime = new Date(now.getTime() + 15 * 60000);
+                    const bufferTime = new Date(now.getTime() + 15 * 60000); // 15 min de marge
 
                     if (slotTime > bufferTime) {
                         const timeString = `${h.toString().padStart(2, '0')}h${m.toString().padStart(2, '0')}`;
@@ -85,7 +82,7 @@ const CartSidebar = () => {
         };
 
         try {
-            const response = await fetch('/api/orders', {
+            const response = await fetch('http://localhost:3000/api/orders', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(orderData)
@@ -114,152 +111,208 @@ const CartSidebar = () => {
         <AnimatePresence>
             {isCartOpen && (
                 <>
+                    {/* OVERLAY FONCÉ (Fond flou qui couvre tout le site) */}
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setIsCartOpen(false)}
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[90]"
                     />
 
+                    {/* PANNEAU LATÉRAL DU PANIER */}
                     <motion.div
                         initial={{ x: '100%' }}
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
-                        transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                        className="fixed top-0 right-0 h-full w-full md:w-[500px] bg-[#FAF9F6] bg-grain shadow-2xl z-50 overflow-y-auto flex flex-col font-body border-l-4 border-primary"
+                        transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                        className="fixed top-0 right-0 h-[100dvh] w-full md:w-[450px] lg:w-[500px] bg-white shadow-2xl z-[100] flex flex-col font-body"
                     >
-                        {/* HEADER */}
-                        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-white sticky top-0 z-10">
-                            <h2 className="font-title text-3xl text-slate-800">Mon Panier</h2>
-                            <button onClick={() => setIsCartOpen(false)} className="w-10 h-10 rounded-full bg-slate-100 hover:bg-red-100 hover:text-red-500 transition-colors flex items-center justify-center font-bold text-xl">✕</button>
+                        {/* HEADER STICKY */}
+                        <div className="flex-none p-6 border-b border-slate-100 flex justify-between items-center bg-white/90 backdrop-blur-md z-10">
+                            <h2 className="font-title text-2xl text-slate-800 flex items-center gap-3">
+                                Mon Panier
+                                {cartItems.length > 0 && (
+                                    <span className="bg-primary text-white text-sm px-3 py-1 rounded-full font-bold">
+                                        {getCartCount()}
+                                    </span>
+                                )}
+                            </h2>
+                            <button
+                                onClick={() => setIsCartOpen(false)}
+                                className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center font-bold"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
                         </div>
 
-                        {/* CONTENT */}
-                        <div className="flex-grow p-6">
-
-                            {/* ÉCRAN DE SUCCÈS */}
+                        {/* CONTENU SCROLLABLE (Produits + Formulaire) */}
+                        <div className="flex-1 overflow-y-auto bg-slate-50 p-6">
                             {orderSuccess ? (
-                                <div className="text-center py-20">
-                                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                        <span className="text-4xl"></span>
+                                <div className="text-center py-20 animate-fade-in-up">
+                                    <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <span className="text-5xl">🎉</span>
                                     </div>
-                                    <h3 className="font-title text-2xl text-green-600 mb-4">Commande Reçue !</h3>
-                                    <p className="text-slate-600 mb-2">Merci <strong>{formData.name}</strong>.</p>
-                                    <p className="text-slate-500 text-sm">Nous avons envoyé un mail à la gérante.</p>
-                                    <p className="text-primary font-bold mt-4 animate-pulse">On vous rappelle très vite pour confirmer ! 📞</p>
+                                    <h3 className="font-title text-3xl text-green-600 mb-4">Commande Validée !</h3>
+                                    <p className="text-slate-600 mb-2 text-lg">Merci <strong>{formData.name}</strong>.</p>
+                                    <p className="text-slate-500 mb-8">Votre commande a bien été transmise à notre équipe.</p>
+                                    <div className="inline-block bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-100 text-primary font-bold animate-pulse">
+                                        On vous rappelle très vite pour confirmer ! 📞
+                                    </div>
+                                </div>
+                            ) : cartItems.length === 0 ? (
+                                <div className="text-center py-32 flex flex-col items-center">
+                                    <span className="text-7xl mb-6 opacity-80">🍩</span>
+                                    <h3 className="font-title text-2xl text-slate-700 mb-2">Votre panier est vide</h3>
+                                    <p className="text-slate-500">Il est temps de se faire plaisir !</p>
+                                    <button
+                                        onClick={() => setIsCartOpen(false)}
+                                        className="mt-8 px-6 py-3 bg-white text-primary border-2 border-primary rounded-xl font-bold hover:bg-primary hover:text-white transition-colors"
+                                    >
+                                        Voir la carte
+                                    </button>
                                 </div>
                             ) : (
-                                <>
-                                    {cartItems.length === 0 ? (
-                                        <div className="text-center py-20 opacity-50">
-                                            <span className="text-6xl block mb-4">🍩</span>
-                                            <p className="font-title text-xl">Votre panier est vide...</p>
-                                            <p className="text-sm">Allez vite choisir une gourmandise !</p>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="space-y-4 mb-8">
-                                                {cartItems.map(item => (
-                                                    <div key={item.id} className="flex gap-4 bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
-                                                        <img src={item.image_url} alt={item.name} className="w-20 h-20 object-cover rounded-xl" />
-                                                        <div className="flex-grow flex flex-col justify-between">
-                                                            <div className="flex justify-between items-start">
-                                                                <h4 className="font-bold text-slate-800 leading-tight">{item.name}</h4>
-                                                                <span className="font-hand font-bold text-primary">{formatPrice(item.price * item.quantity)}</span>
-                                                            </div>
-                                                            <div className="flex justify-between items-center">
-                                                                <span className="text-xs text-slate-400">{formatPrice(item.price)} / unité</span>
-                                                                <div className="flex items-center gap-3 bg-slate-50 rounded-full px-2 py-1 border border-slate-200">
-                                                                    <button onClick={() => removeFromCart(item.id)} className="w-6 h-6 flex items-center justify-center font-bold text-slate-500 hover:text-red-500">-</button>
-                                                                    <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
-                                                                    <button onClick={() => addToCart(item)} className="w-6 h-6 flex items-center justify-center font-bold text-slate-500 hover:text-green-500">+</button>
-                                                                </div>
-                                                            </div>
+                                <div className="space-y-8">
+                                    {/* LISTE DES PRODUITS */}
+                                    <div className="space-y-4">
+                                        {cartItems.map((item, index) => (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: index * 0.1 }}
+                                                key={item.id}
+                                                className="flex gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 relative group"
+                                            >
+                                                <img src={item.image_url} alt={item.name} className="w-20 h-20 object-cover rounded-xl" />
+                                                <div className="flex-1 flex flex-col justify-between">
+                                                    <div className="flex justify-between items-start pr-6">
+                                                        <h4 className="font-bold text-slate-800 leading-tight">{item.name}</h4>
+                                                    </div>
+                                                    <div className="flex justify-between items-center mt-2">
+                                                        <span className="font-hand font-bold text-lg text-primary">{formatPrice(item.price * item.quantity)}</span>
+
+                                                        {/* Contrôleur de quantité moderne */}
+                                                        <div className="flex items-center bg-slate-50 rounded-lg border border-slate-200 p-1">
+                                                            <button type="button" onClick={() => removeFromCart(item.id)} className="w-7 h-7 flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm rounded transition-all">-</button>
+                                                            <span className="font-bold text-sm w-8 text-center">{item.quantity}</span>
+                                                            <button type="button" onClick={() => addToCart(item)} className="w-7 h-7 flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm rounded transition-all">+</button>
                                                         </div>
                                                     </div>
-                                                ))}
+                                                </div>
+                                                {/* Bouton supprimer absolu */}
+                                                <button onClick={() => removeFromCart(item.id)} className="absolute top-3 right-3 text-slate-300 hover:text-red-500 transition-colors">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+
+                                    {/* SÉPARATEUR */}
+                                    <div className="flex items-center gap-4 py-2">
+                                        <div className="h-px bg-slate-200 flex-1"></div>
+                                        <span className="text-slate-400 font-medium text-sm">Validation</span>
+                                        <div className="h-px bg-slate-200 flex-1"></div>
+                                    </div>
+
+                                    {/* FORMULAIRE DE COMMANDE */}
+                                    <form id="order-form" onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-5">
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Nom complet</label>
+                                                <input required type="text" name="name" placeholder="Ex: Jean Dupont" value={formData.name} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
                                             </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Téléphone</label>
+                                                    <input required type="tel" name="phone" placeholder="06 12 34 56 78" value={formData.phone} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Email</label>
+                                                    <input required type="email" name="email" placeholder="jean@mail.com" value={formData.email} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                            {/* FORMULAIRE DE COMMANDE */}
-                                            <form onSubmit={handleSubmit} className="bg-white p-5 rounded-3xl shadow-md border border-slate-100">
-                                                <h3 className="font-title text-xl mb-4 flex items-center gap-2">
-                                                    <span className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-sm">📝</span>
-                                                    Vos Coordonnées
-                                                </h3>
+                                        {/* OPTION LIVRAISON DESIGN */}
+                                        <div className="pt-4 border-t border-slate-100">
+                                            <div
+                                                onClick={() => setFormData(prev => ({ ...prev, delivery: !prev.delivery }))}
+                                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 flex items-center justify-between ${formData.delivery ? 'border-primary bg-primary/5' : 'border-slate-100 hover:border-slate-200 bg-white'}`}
+                                            >
+                                                <div>
+                                                    <h4 className="font-bold text-slate-700">Je souhaite être livré</h4>
+                                                    <p className="text-xs text-slate-500 mt-0.5">Sous réserve de validation par téléphone</p>
+                                                </div>
+                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${formData.delivery ? 'border-primary bg-primary' : 'border-slate-300'}`}>
+                                                    {formData.delivery && <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                                <div className="space-y-3">
-                                                    <input required type="text" name="name" placeholder="Votre Nom" value={formData.name} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary transition-colors" />
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <input required type="tel" name="phone" placeholder="Téléphone" value={formData.phone} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary transition-colors" />
-                                                        <input required type="email" name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary transition-colors" />
+                                        {/* CHAMPS ADRESSE AVEC ANIMATION */}
+                                        <AnimatePresence>
+                                            {formData.delivery && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                    exit={{ opacity: 0, height: 0 }}
+                                                    className="space-y-4 overflow-hidden pt-2"
+                                                >
+                                                    <div>
+                                                        <input required type="text" name="address" placeholder="Adresse complète (Numéro et Rue)" value={formData.address} onChange={handleChange} className="w-full bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
                                                     </div>
-                                                </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <input required type="text" name="zip" placeholder="Code Postal" value={formData.zip} onChange={handleChange} className="w-full bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary transition-all" />
+                                                        <input required type="text" name="city" placeholder="Ville" value={formData.city} onChange={handleChange} className="w-full bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary transition-all" />
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
 
-                                                {/* TOGGLE LIVRAISON */}
-                                                <div className="mt-6">
-                                                    <label className="flex items-center gap-3 cursor-pointer group">
-                                                        <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${formData.delivery ? 'bg-primary' : 'bg-slate-300'}`}>
-                                                            <div className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 ${formData.delivery ? 'translate-x-6' : ''}`} />
-                                                        </div>
-                                                        <input type="checkbox" name="delivery" checked={formData.delivery} onChange={handleChange} className="hidden" />
-                                                        <span className="font-bold text-slate-700">Je souhaite être livré</span>
-                                                    </label>
-                                                    {formData.delivery && <p className="text-xs text-orange-500 mt-1 font-bold ml-14">⚠️ Sous réserve de validation par la gérante</p>}
-                                                </div>
-
-                                                {/* CHAMPS ADRESSE (Si livraison) */}
-                                                {formData.delivery && (
-                                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-4 space-y-3 overflow-hidden">
-                                                        <input required type="text" name="address" placeholder="Numéro et Rue" value={formData.address} onChange={handleChange} className="w-full bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary" />
-                                                        <div className="grid grid-cols-2 gap-3">
-                                                            <input required type="text" name="zip" placeholder="Code Postal" value={formData.zip} onChange={handleChange} className="w-full bg-orange-50 border border-orange-200 rounded-xl px-4 py-3" />
-                                                            <input required type="text" name="city" placeholder="Ville" value={formData.city} onChange={handleChange} className="w-full bg-orange-50 border border-orange-200 rounded-xl px-4 py-3" />
-                                                        </div>
-                                                    </motion.div>
+                                        <div className="pt-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Heure souhaitée (De 14h à 18h)</label>
+                                            <select required name="timeSlot" value={formData.timeSlot} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer appearance-none">
+                                                <option value="" disabled>-- Choisir l'heure --</option>
+                                                {availableSlots.length > 0 ? (
+                                                    availableSlots.map(slot => (
+                                                        <option key={slot} value={slot}>{slot}</option>
+                                                    ))
+                                                ) : (
+                                                    <option disabled>Fermé ou trop tard pour aujourd'hui</option>
                                                 )}
-
-                                                {/* SÉLECTEUR CRÉNEAU */}
-                                                <div className="mt-6">
-                                                    <label className="block font-bold text-slate-700 mb-2">Heure de retrait / livraison souhaitée :</label>
-                                                    <select required name="timeSlot" value={formData.timeSlot} onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-700 focus:outline-none focus:border-primary cursor-pointer">
-                                                        <option value="">-- Choisir un créneau --</option>
-                                                        {availableSlots.length > 0 ? (
-                                                            availableSlots.map(slot => (
-                                                                <option key={slot} value={slot}>{slot}</option>
-                                                            ))
-                                                        ) : (
-                                                            <option disabled>Aucun créneau disponible aujourd'hui (Fermé ou trop tard)</option>
-                                                        )}
-                                                    </select>
-                                                    <p className="text-xs text-slate-400 mt-1 text-center">Ouvert de 14h à 18h (Sauf Mardi)</p>
-                                                </div>
-                                            </form>
-                                        </>
-                                    )}
-                                </>
+                                            </select>
+                                        </div>
+                                    </form>
+                                </div>
                             )}
                         </div>
 
-                        {/* FOOTER (TOTAL & BOUTON) */}
+                        {/* FOOTER STICKY (TOTAL & BOUTON) */}
                         {!orderSuccess && cartItems.length > 0 && (
-                            <div className="p-6 bg-white border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] sticky bottom-0">
-                                <div className="flex justify-between items-end mb-4">
-                                    <span className="text-slate-500 font-bold uppercase text-sm">Total à payer (sur place)</span>
-                                    <span className="font-hand text-4xl font-bold text-slate-800">{formatPrice(getCartTotal())}</span>
+                            <div className="flex-none p-6 bg-white border-t border-slate-100 shadow-[0_-10px_30px_rgba(0,0,0,0.03)] z-10">
+                                <div className="flex justify-between items-end mb-4 px-2">
+                                    <span className="text-slate-500 font-bold uppercase text-sm">Total à payer</span>
+                                    <span className="font-title text-3xl font-bold text-slate-800">{formatPrice(getCartTotal())}</span>
+                                    <span className="text-red-600">Le paiement se fait uniquement au comptoir !</span>
                                 </div>
                                 <button
-                                    onClick={handleSubmit}
+                                    form="order-form"
+                                    type="submit"
                                     disabled={isSubmitting || availableSlots.length === 0}
-                                    className={`w-full py-4 rounded-2xl font-title text-xl text-white shadow-lg transition-all transform active:scale-95 flex justify-center items-center gap-2 ${availableSlots.length === 0 ? 'bg-slate-400 cursor-not-allowed' : 'bg-primary hover:bg-orange-500 hover:shadow-primary/30'}`}
+                                    className={`w-full py-4 rounded-xl font-title text-xl text-white shadow-lg transition-all transform active:scale-95 flex justify-center items-center gap-2 ${availableSlots.length === 0 ? 'bg-slate-300 shadow-none cursor-not-allowed' : 'bg-primary hover:bg-primary-dark hover:shadow-primary/30'}`}
                                 >
                                     {isSubmitting ? (
                                         <span className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full"/>
                                     ) : (
-                                        <>Envoyer ma commande</>
+                                        <>Confirmer la commande</>
                                     )}
                                 </button>
-                                {availableSlots.length === 0 && <p className="text-center text-red-500 text-xs font-bold mt-2">Désolé, nous sommes fermés pour aujourd'hui !</p>}
+                                {availableSlots.length === 0 && <p className="text-center text-red-500 text-sm font-bold mt-3">Désolé, les commandes sont fermées pour aujourd'hui !</p>}
                             </div>
                         )}
                     </motion.div>
