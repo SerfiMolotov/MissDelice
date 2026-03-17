@@ -85,18 +85,18 @@ const Footer = () => {
                                 <svg className="w-5 h-5 text-primary hidden md:block flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                             </li>
 
-                            {/* BLOC HORAIRES STRICTEMENT HORIZONTAL */}
-                            <li className="w-full mt-4 pt-4 border-t border-white/10">
-                                <div className="flex flex-row justify-center md:justify-end items-center gap-3">
+                            {/* BLOC HORAIRES EN GRILLE INVISIBLE */}
+                            <li className="w-full mt-4 pt-4 border-t border-white/10 flex justify-center md:justify-end">
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-2 w-fit text-left">
                                     {groupedHours.length > 0 ? groupedHours.map((group, index) => (
-                                        <div key={index} className="flex flex-row items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 whitespace-nowrap shadow-sm">
-                                            <span className="text-slate-400 text-xs font-semibold">
+                                        <div key={index} className="flex justify-between items-center gap-3 whitespace-nowrap">
+                                            <span className="text-slate-400 text-sm">
                                                 {group.startDay === group.endDay ? group.startDay.substring(0,3) : `${group.startDay.substring(0,3)}-${group.endDay.substring(0,3)}`}.
                                             </span>
                                             {group.is_closed ? (
-                                                <span className="text-red-400 font-bold uppercase text-[10px] tracking-wider">Fermé</span>
+                                                <span className="text-red-400 font-bold uppercase text-xs">Fermé</span>
                                             ) : (
-                                                <span className="font-bold text-white text-xs">{group.hours_text}</span>
+                                                <span className="font-bold text-white text-sm">{group.hours_text}</span>
                                             )}
                                         </div>
                                     )) : (
