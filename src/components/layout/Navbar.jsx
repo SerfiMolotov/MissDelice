@@ -106,19 +106,18 @@ const Navbar = () => {
                         </span>
                         <span className={`absolute bottom-0 left-0 w-full h-1 -z-0 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left ${scrolled || !isHome ? 'bg-primary/20' : 'bg-white/30'}`}></span>
                         
-                        {/* Boîte du Menu Déroulant */}
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 p-4 font-body text-base cursor-default text-slate-800">
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max min-w-[280px] bg-white rounded-2xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 p-5 font-body text-base cursor-default text-slate-800">
                             <h4 className="font-bold text-slate-400 uppercase text-xs tracking-widest border-b border-slate-100 pb-2 mb-3 text-center">Ouverture</h4>
                             
                             {groupedHours.length > 0 ? groupedHours.map((group, index) => (
-                                <div key={index} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 last:pb-0 first:pt-0">
-                                    <span className="text-slate-600 text-sm font-semibold">
+                                <div key={index} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 last:pb-0 first:pt-0 gap-6">
+                                    <span className="text-slate-600 text-sm font-semibold whitespace-nowrap">
                                         {group.startDay === group.endDay ? group.startDay.substring(0,3) : `${group.startDay.substring(0,3)} - ${group.endDay.substring(0,3)}`}.
                                     </span>
                                     {group.is_closed ? (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-100 text-red-600 uppercase">Fermé</span>
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-100 text-red-600 uppercase whitespace-nowrap">Fermé</span>
                                     ) : (
-                                        <span className="font-bold text-primary text-sm">{group.hours_text}</span>
+                                        <span className="font-bold text-primary text-sm text-right whitespace-nowrap">{group.hours_text}</span>
                                     )}
                                 </div>
                             )) : (
