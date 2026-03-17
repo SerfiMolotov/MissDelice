@@ -313,21 +313,13 @@ const Menu = () => {
                                                 {item.description}
                                             </p>
                                         </div>
-
-                                        <div className="flex justify-end mt-2 pt-2 border-t border-slate-100">
-                                            <button className="text-xs font-bold text-slate-400 flex items-center gap-1 hover:text-primary transition-colors">
-                                                <span className="w-5 h-5 rounded-full border border-slate-300 flex items-center justify-center font-serif italic">i</span>
-                                                Infos
-                                            </button>
-                                        </div>
                                         {!item.is_out_of_stock && (
                                             <button
                                                 onClick={() => {
                                                     addToCart(item);
                                                     setIsCartOpen(true);
                                                 }}
-                                                className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-primary hover:shadow-lg hover:-translate-y-1 transition-all flex items-center gap-2"
-                                            >
+                                                    className="w-fit inline-flex items-center gap-2 h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-primary hover:shadow-lg hover:-translate-y-1 transition-all"                                            >
                                                 <span>Ajouter</span>
                                                 <span className="bg-white/20 w-5 h-5 flex items-center justify-center rounded-full text-xs">+</span>
                                             </button>
